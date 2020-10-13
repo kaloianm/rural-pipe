@@ -21,7 +21,7 @@
 namespace ruralpi {
 namespace {
 
-// TEST
+// TODO: Open the 'tun' device
 
 } // namespace
 

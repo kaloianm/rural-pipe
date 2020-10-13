@@ -16,29 +16,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Import('env')
-arm_env = env.Clone()
-arm_env.Append(LIBPATH=[Dir('boost_for_raspberrypi/lib')])
-arm_env.Append(CPPPATH=[Dir('boost_for_raspberrypi/include')])
+native_env = env.Clone()
+native_env.Append(CPPPATH=[Dir('.').abspath])
 
-arm_env['TARGET_ARCH'] = 'arm'
-
-arm_cross_compiler = 'arm-linux-gnueabihf-'
-for (tool, name) in [
-    ('CXX', 'g++'),
-]:
-    arm_env[tool] = arm_cross_compiler + name
-
-# Cross-compile Boost for Raspberry Pi
-arm_env.Command(
-    arm_env.Dir('boost_for_raspberrypi').abspath, None, [
-        Mkdir(arm_env.Dir('.')),
-        str(arm_env.File('make_boost_for_raspberrypi.sh')) + ' ' +
-        arm_env.Dir('boost_for_raspberrypi').abspath + ' ' +
-        ARGUMENTS.get('BOOST_ARCHIVE', '1.74.0') + ' ' + ' > boost_for_raspberrypi_build.log'
-    ])
-
-# Compile the Raspberry Pi client
-arm_env.Program(target='client', source=[
-    'client_main.cpp',
-    'tun_ctl.cpp',
-], LIBS='boost_program_options')
+SConscript('client/SConscript', exports='native_env')

@@ -15,8 +15,32 @@
 # DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import os
+Import('native_env')
+arm_env = native_env.Clone()
+arm_env.Append(LIBPATH=[Dir('boost_for_raspberrypi/lib')])
+arm_env.Append(CPPPATH=[Dir('boost_for_raspberrypi/include')])
 
-env = Environment(ENV=os.environ)
+arm_env['TARGET_ARCH'] = 'arm'
 
-SConscript('native/SConscript', exports='env', variant_dir='build/native', duplicate=0)
+# Change the compiler/liker to be that for ARM
+arm_cross_compiler = 'arm-linux-gnueabihf-'
+for (tool, name) in [
+    ('CXX', 'g++'),
+]:
+    arm_env[tool] = arm_cross_compiler + name
+
+# Compile the Boost libraries for Raspberry Pi
+boost_for_raspberrypi = arm_env.Command(
+    arm_env.Dir('boost_for_raspberrypi').abspath, None, [
+        Mkdir(arm_env.Dir('.')),
+        str(arm_env.File('make_boost_for_raspberrypi.sh')) + ' ' +
+        arm_env.Dir('boost_for_raspberrypi').abspath + ' ' +
+        ARGUMENTS.get('BOOST_ARCHIVE', '1.74.0') + ' ' + ' > boost_for_raspberrypi_build.log'
+    ])
+
+# Compile the Raspberry Pi client
+client = arm_env.Program(target='client', source=[
+    'client_main.cpp',
+    'tun_ctl.cpp',
+], LIBS='boost_program_options')
+Depends(client, boost_for_raspberrypi)
