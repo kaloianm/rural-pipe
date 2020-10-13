@@ -34,7 +34,7 @@ arm_env.Command(
         Mkdir(arm_env.Dir('.')),
         str(arm_env.File('make_boost_for_raspberrypi.sh')) + ' ' +
         arm_env.Dir('boost_for_raspberrypi').abspath + ' ' +
-        ARGUMENTS.get('BOOST_ARCHIVE', '1.74.0') + ' ' + ' > boost_for_raspberrypi.log'
+        ARGUMENTS.get('BOOST_ARCHIVE', '1.74.0') + ' ' + ' > boost_for_raspberrypi_build.log'
     ])
 
 # Compile the Raspberry Pi client

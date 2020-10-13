@@ -1,3 +1,5 @@
+.vscode/browse.vc.*
 build/
 
 .sconsign.dblite
+boost_for_raspberrypi_build.log
