@@ -4,6 +4,11 @@ A Raspberry Pi-based client/server system to unify the bandwidth of multiple ava
 
 ## INSTALLATION
 
+These installation and build instructions assume a development machine (DEV), separate from the Raspberry Pi (RPI), running Ubuntu 20.04.
+
+1. (On DEV): Install the build essentials package: `sudo apt install build-essential`
+1. (On DEV): Install the ARM cross-compiler and debugger: `sudo apt install g++-arm-linux-gnueabihf gdb-multiarch`
+1. (On RPI): Install the GDB server on the Raspberry Pi: `sudo apt install gdbserver`
 1. Clone this repository
 1. Run `scons`
 
