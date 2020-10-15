@@ -17,6 +17,17 @@
 
 import os
 
-env = Environment(ENV=os.environ)
+# Define the command-line options for the build
+
+# --client_target
+client_targets = {
+    'pi': 'arm-linux-gnueabihf-',
+    'pc': '',
+}
+AddOption('--client_target', dest='client_target', type='choice',
+          choices=list(client_targets.keys()), default='pc',
+          help='Use CLIENT_TARGET as the architecture for the client')
+
+env = Environment(ENV=os.environ, CLIENT_COMPILER_PREFIX=client_targets[GetOption('client_target')])
 
 SConscript('native/SConscript', exports='env', variant_dir='build/native', duplicate=0)

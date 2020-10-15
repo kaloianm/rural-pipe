@@ -2,4 +2,5 @@
 build/
 
 .sconsign.dblite
-boost_for_raspberrypi_build.log
+boost_for_client_build.log
+boost_for_server_build.log

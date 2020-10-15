@@ -17,31 +17,18 @@
 
 Import('native_env')
 arm_env = native_env.Clone()
-arm_env.Append(LIBPATH=[Dir('boost_for_raspberrypi/lib')])
-arm_env.Append(CPPPATH=[Dir('boost_for_raspberrypi/include')])
+arm_env.Append(LIBPATH=[Dir('../boost_for_client/lib')])
+arm_env.Append(CPPPATH=[Dir('../boost_for_client/include')])
 
-arm_env['TARGET_ARCH'] = 'arm'
-
-# Change the compiler/liker to be that for ARM
-arm_cross_compiler = 'arm-linux-gnueabihf-'
+# Change the compiler/liker to match the target architecture
 for (tool, name) in [
     ('CXX', 'g++'),
 ]:
-    arm_env[tool] = arm_cross_compiler + name
-
-# Compile the Boost libraries for Raspberry Pi
-boost_for_raspberrypi = arm_env.Command(
-    arm_env.Dir('boost_for_raspberrypi').abspath, None, [
-        Mkdir(arm_env.Dir('.')),
-        str(arm_env.File('make_boost_for_raspberrypi.sh')) + ' ' +
-        arm_env.Dir('boost_for_raspberrypi').abspath + ' ' +
-        ARGUMENTS.get('BOOST_ARCHIVE', '1.74.0') + ' ' + ' > boost_for_raspberrypi_build.log'
-    ])
+    arm_env[tool] = arm_env['CLIENT_COMPILER_PREFIX'] + name
 
 # Compile the Raspberry Pi client
-client = arm_env.Program(target='client', source=[
+arm_env.Program(target='client', source=[
     'client_main.cpp',
     'context.cpp',
     'tun_ctl.cpp',
 ], LIBS=['boost_program_options', 'pthread'])
-Depends(client, boost_for_raspberrypi)

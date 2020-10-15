@@ -18,12 +18,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 if [ "$#" -lt 2 ]; then
-    echo "Usage: $0 <INSTALL DIRECTORY> <VERSION>"
+    echo "Usage: $0 <INSTALL DIRECTORY> <VERSION> <PLATFORM PREFIX>"
     exit 1
 fi
 
 export INSTALL_DIR="$1"
 export VERSION="$2"
+export PLATFORM_PREFIX="$3"
 
 if [ ! -d "$HOME/Downloads" ]; then
     echo "$0 requires $HOME/Downloads to be present, please make it"
@@ -38,15 +39,15 @@ if [ ! -f "$BOOST_ARCHIVE" ]; then
 fi
 
 echo "Extracting Boost archive $BOOST_ARCHIVE ..."
-export EXTRACT_DIR=`mktemp -d`
+export EXTRACT_DIR=`mktemp -d -t BoostXXX`
 tar jxf $BOOST_ARCHIVE --directory $EXTRACT_DIR
 export BOOST_ROOT=$EXTRACT_DIR/`ls -U -1 $EXTRACT_DIR | head -1`
 
 echo "Building Boost in $BOOST_ROOT ..."
 pushd $BOOST_ROOT
 ./bootstrap.sh --with-libraries=program_options
-echo "using gcc : raspberrypi : /usr/bin/arm-linux-gnueabihf-g++ : <cxxflags>-std=c++17 ;" > ./tools/build/src/user-config.jam
-./b2 -d+2 --prefix=$EXTRACT_DIR/boost --exec-prefix=$EXTRACT_DIR/boost toolset=gcc-raspberrypi link=static install
+echo "using gcc : platform : /usr/bin/${PLATFORM_PREFIX}g++ : <cxxflags>-std=c++17 ;" > ./tools/build/src/user-config.jam
+./b2 -d+2 --prefix=$EXTRACT_DIR/boost --exec-prefix=$EXTRACT_DIR/boost toolset=gcc-platform link=static install
 
 echo "Installing in $INSTALL_DIR ..."
 mv $EXTRACT_DIR/boost $INSTALL_DIR

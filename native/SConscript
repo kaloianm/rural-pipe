@@ -19,4 +19,14 @@ Import('env')
 native_env = env.Clone()
 native_env.Append(CPPPATH=[Dir('.').abspath])
 
+# Target for Boost (which is shared between the client and server)
+native_env.Command(
+    native_env.Dir('boost_for_client').abspath, None, [
+        Mkdir(native_env.Dir('.')),
+        str(native_env.File('make_boost_for_platform.sh')) + ' ' +
+        native_env.Dir('boost_for_client').abspath + ' ' +
+        ARGUMENTS.get('BOOST_VERSION', '1.74.0') + ' ' + native_env['CLIENT_COMPILER_PREFIX'] +
+        ' > boost_for_client_build.log'
+    ])
+
 SConscript('client/SConscript', exports='native_env')
