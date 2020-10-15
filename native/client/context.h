@@ -16,22 +16,30 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
-#include "client/tun_ctl.h"
+#pragma once
 
-#include "client/context.h"
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/variables_map.hpp>
 
 namespace ruralpi {
-namespace {
 
-// TODO: Open the 'tun' device
+struct Options {
+    Options(int argc, const char *argv[]);
 
-} // namespace
+    bool help() const;
+    const auto &desc() const { return _desc; }
 
-TunCtl::TunCtl(std::string deviceName, int numQueues)
-    : _deviceName(std::move(deviceName)), _numQueues(numQueues) {}
+    int nqueues;
 
-TunCtl::ScopedFileDescriptors::ScopedFileDescriptors() {}
+private:
+    boost::program_options::options_description _desc;
+    boost::program_options::variables_map _vm;
+};
 
-TunCtl::ScopedFileDescriptors::~ScopedFileDescriptors() {}
+struct Context {
+    explicit Context(Options options);
+
+    const Options options;
+};
 
 } // namespace ruralpi

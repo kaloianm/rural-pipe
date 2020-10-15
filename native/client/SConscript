@@ -41,6 +41,7 @@ boost_for_raspberrypi = arm_env.Command(
 # Compile the Raspberry Pi client
 client = arm_env.Program(target='client', source=[
     'client_main.cpp',
+    'context.cpp',
     'tun_ctl.cpp',
-], LIBS='boost_program_options')
+], LIBS=['boost_program_options', 'pthread'])
 Depends(client, boost_for_raspberrypi)

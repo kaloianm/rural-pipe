@@ -1,3 +1,4 @@
+
 /**
  * Copyright 2020 Kaloian Manassiev
  *
@@ -16,22 +17,29 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
-#include "client/tun_ctl.h"
-
 #include "client/context.h"
 
+#include <boost/program_options/parsers.hpp>
+
 namespace ruralpi {
-namespace {
 
-// TODO: Open the 'tun' device
+Context::Context(Options options) : options(std::move(options)) {}
 
-} // namespace
+namespace po = boost::program_options;
 
-TunCtl::TunCtl(std::string deviceName, int numQueues)
-    : _deviceName(std::move(deviceName)), _numQueues(numQueues) {}
+Options::Options(int argc, const char *argv[]) : _desc("Client options") {
+    // clang-format off
+    _desc.add_options()
+        ("help", "Produces this help message")
+        ("nqueues", po::value<int>()->default_value(1), "Number of queues/threads to instantiate");
+    // clang-format on
 
-TunCtl::ScopedFileDescriptors::ScopedFileDescriptors() {}
+    po::store(po::parse_command_line(argc, argv, _desc), _vm);
+    po::notify(_vm);
 
-TunCtl::ScopedFileDescriptors::~ScopedFileDescriptors() {}
+    nqueues = _vm["nqueues"].as<int>();
+}
+
+bool Options::help() const { return _vm.count("help"); }
 
 } // namespace ruralpi

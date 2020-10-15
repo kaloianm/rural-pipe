@@ -16,39 +16,32 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
-#include <boost/program_options/options_description.hpp>
-#include <boost/program_options/parsers.hpp>
-#include <boost/program_options/variables_map.hpp>
 #include <iostream>
+#include <thread>
 
+#include "client/context.h"
 #include "client/tun_ctl.h"
-
-namespace po = boost::program_options;
 
 namespace ruralpi {
 namespace {
 
-struct ClientInstanceEnvironment {
-    ClientInstanceEnvironment(int argc, const char *argv[]) : desc("Client options") {
-        desc.add_options()("help", "Produces this help message");
+int clientMain(Context ctx) {
+    std::cout << "Rural Pipe client starting with " << ctx.options.nqueues << " queues "
+              << std::endl;
 
-        po::store(po::parse_command_line(argc, argv, desc), vm);
-        po::notify(vm);
+    TunCtl tunnel("/dev/tun", ctx.options.nqueues);
+
+    std::vector<std::thread> threads;
+    for (int i = 0; i < ctx.options.nqueues; i++) {
+        threads.emplace_back([&tunnel, queueId = i] {
+            // TODO: Run the epoll loops for each queue
+        });
     }
 
-    bool help() const { return vm.count("help"); }
-
-    po::options_description desc;
-    po::variables_map vm;
-};
-
-int clientMain(const ClientInstanceEnvironment &env) {
-    if (env.help()) {
-        std::cout << env.desc;
-        return 1;
+    for (auto &t : threads) {
+        t.join();
     }
 
-    std::cout << "Rural Pipe client" << std::endl;
     return 0;
 }
 
@@ -56,5 +49,17 @@ int clientMain(const ClientInstanceEnvironment &env) {
 } // namespace ruralpi
 
 int main(int argc, const char *argv[]) {
-    return ruralpi::clientMain(ruralpi::ClientInstanceEnvironment(argc, argv));
+    try {
+        ruralpi::Context ctx(ruralpi::Options(argc, argv));
+
+        if (ctx.options.help()) {
+            std::cout << ctx.options.desc();
+            return 1;
+        }
+
+        ruralpi::clientMain(std::move(ctx));
+        return 0;
+    } catch (const std::exception &ex) {
+        return 1;
+    }
 }
