@@ -15,20 +15,23 @@
 # DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import os
+
 Import('native_env')
-arm_env = native_env.Clone()
-arm_env.Append(LIBPATH=[Dir('../boost_for_client/lib')])
-arm_env.Append(CPPPATH=[Dir('../boost_for_client/include')])
+env = native_env.Clone()
+env.Append(LIBPATH=[Dir('../boost_for_client/lib'), Dir('../common')])
+env.Append(CPPPATH=[Dir('../boost_for_client/include'), Dir('../common')])
 
 # Change the compiler/liker to match the target architecture
 for (tool, name) in [
     ('CXX', 'g++'),
 ]:
-    arm_env[tool] = arm_env['CLIENT_COMPILER_PREFIX'] + name
+    env[tool] = env['CLIENT_COMPILER_PREFIX'] + name
 
 # Compile the Raspberry Pi client
-arm_env.Program(target='client', source=[
+client = env.Program(target='client', source=[
     'client_main.cpp',
     'context.cpp',
     'tun_ctl.cpp',
-], LIBS=['boost_program_options', 'pthread'])
+], LIBS=['boost_program_options', 'common', 'pthread'])
+env.Install(os.path.join(Dir('#').abspath, 'install/client'), [client])

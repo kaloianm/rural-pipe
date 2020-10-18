@@ -17,7 +17,7 @@
 
 Import('env')
 native_env = env.Clone()
-native_env.Append(CPPPATH=[Dir('.').abspath])
+native_env.Append(CPPPATH=[Dir('.').abspath], LIBPATH=[Dir('.').abspath])
 
 # Target for Boost (which is shared between the client and server)
 native_env.Command(
@@ -29,4 +29,6 @@ native_env.Command(
         ' > boost_for_client_build.log'
     ])
 
+SConscript('common/SConscript', exports='native_env')
 SConscript('client/SConscript', exports='native_env')
+SConscript('server/SConscript', exports='native_env')

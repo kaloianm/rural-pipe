@@ -15,20 +15,5 @@
 # DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import os
-
-# Define the command-line options for the build
-
-# --client_target
-client_targets = {
-    'pi': 'arm-linux-gnueabihf-',
-    'pc': '',
-}
-AddOption('--client_target', dest='client_target', type='choice',
-          choices=list(client_targets.keys()), default='pc',
-          help='Use CLIENT_TARGET as the architecture for the client')
-
-env = Environment(ENV=os.environ, CLIENT_COMPILER_PREFIX=client_targets[GetOption('client_target')])
-
-SConscript('native/SConscript', exports='env', variant_dir='build/native', duplicate=0)
-SConscript('control/SConscript', exports='env', variant_dir='build/control', duplicate=0)
+Import('control_env')
+env = control_env.Clone()

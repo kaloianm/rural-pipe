@@ -17,6 +17,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #include <iostream>
+#include <netinet/ip.h>
 #include <thread>
 
 #include "client/context.h"
@@ -26,17 +27,26 @@ namespace ruralpi {
 namespace {
 
 int clientMain(Context ctx) {
-    std::cout << "Rural Pipe client starting with " << ctx.options.nqueues << " queues "
-              << std::endl;
-
-    TunCtl tunnel("/dev/tun", ctx.options.nqueues);
+    TunCtl tunnel("rpi", ctx.options.nqueues);
 
     std::vector<std::thread> threads;
     for (int i = 0; i < ctx.options.nqueues; i++) {
         threads.emplace_back([&tunnel, queueId = i] {
-            // TODO: Run the epoll loops for each queue
+            int fd = tunnel[queueId];
+            constexpr int kBufferSize = 4096;
+            std::string buffer(kBufferSize, 0);
+            while (true) {
+                int nRead = read(fd, (void *)buffer.data(), kBufferSize);
+
+                const iphdr &ip = *((iphdr *)buffer.data());
+                printf("Read %d bytes: version %d, length %d, protocol %d: \n", nRead, ip.version,
+                       ip.tot_len, ip.protocol);
+            }
         });
     }
+
+    std::cout << "Rural Pipe client started with " << ctx.options.nqueues << " queues "
+              << std::endl;
 
     for (auto &t : threads) {
         t.join();
@@ -60,6 +70,7 @@ int main(int argc, const char *argv[]) {
         ruralpi::clientMain(std::move(ctx));
         return 0;
     } catch (const std::exception &ex) {
+        std::cerr << "Error occurred: " << ex.what() << std::endl;
         return 1;
     }
 }

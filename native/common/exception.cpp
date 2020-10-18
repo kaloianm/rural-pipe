@@ -16,32 +16,25 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
-#pragma once
+#include "common/exception.h"
 
-#include <string>
-#include <vector>
+#include <boost/assert.hpp>
+#include <errno.h>
+#include <string.h>
 
 namespace ruralpi {
 
-/**
- * Creates the 'tun' device on construction (or throws) and closes it at destruction time.
- */
-class TunCtl {
-public:
-    TunCtl(std::string deviceName, int numQueues);
+Exception::Exception(std::string message) : _message(std::move(message)) {}
 
-    int operator[] (int idx) const;
+const char *Exception::what() const noexcept { return _message.c_str(); }
 
-private:
-    const std::string _deviceName;
+void Exception::throwFromErrno() {
+    BOOST_ASSERT(errno);
+    const int savedErrno = errno;
 
-    struct ScopedFileDescriptors {
-        ScopedFileDescriptors(int numDescriptorsToAlloc);
-        ~ScopedFileDescriptors();
-
-        std::vector<int> fds;
-    };
-    ScopedFileDescriptors _fileDescriptors;
-};
+    constexpr size_t kErrTextSize = 4096;
+    std::string errString(kErrTextSize, 0);
+    throw Exception(strerror_r(savedErrno, (char *)errString.data(), kErrTextSize));
+}
 
 } // namespace ruralpi

@@ -18,30 +18,21 @@
 
 #pragma once
 
+#include <exception>
 #include <string>
-#include <vector>
 
 namespace ruralpi {
 
-/**
- * Creates the 'tun' device on construction (or throws) and closes it at destruction time.
- */
-class TunCtl {
+class Exception : public std::exception {
 public:
-    TunCtl(std::string deviceName, int numQueues);
+    Exception(std::string message);
 
-    int operator[] (int idx) const;
+    const char *what() const noexcept override;
+
+    static void throwFromErrno();
 
 private:
-    const std::string _deviceName;
-
-    struct ScopedFileDescriptors {
-        ScopedFileDescriptors(int numDescriptorsToAlloc);
-        ~ScopedFileDescriptors();
-
-        std::vector<int> fds;
-    };
-    ScopedFileDescriptors _fileDescriptors;
+    std::string _message;
 };
 
 } // namespace ruralpi
