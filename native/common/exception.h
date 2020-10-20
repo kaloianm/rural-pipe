@@ -29,6 +29,7 @@ public:
 
     const char *what() const noexcept override;
 
+    static void throwFromErrno(const std::string& context);
     static void throwFromErrno();
 
 private:

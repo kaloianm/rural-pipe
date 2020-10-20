@@ -70,7 +70,7 @@ int main(int argc, const char *argv[]) {
         ruralpi::clientMain(std::move(ctx));
         return 0;
     } catch (const std::exception &ex) {
-        std::cerr << "Error occurred: " << ex.what() << std::endl;
+        std::cerr << "Error occurred: " << std::endl << ex.what() << std::endl;
         return 1;
     }
 }

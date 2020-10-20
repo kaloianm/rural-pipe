@@ -19,6 +19,7 @@
 #include "common/exception.h"
 
 #include <boost/assert.hpp>
+#include <boost/format.hpp>
 #include <errno.h>
 #include <string.h>
 
@@ -28,13 +29,17 @@ Exception::Exception(std::string message) : _message(std::move(message)) {}
 
 const char *Exception::what() const noexcept { return _message.c_str(); }
 
-void Exception::throwFromErrno() {
+void Exception::throwFromErrno(const std::string& context) {
     BOOST_ASSERT(errno);
     const int savedErrno = errno;
 
     constexpr size_t kErrTextSize = 4096;
     std::string errString(kErrTextSize, 0);
-    throw Exception(strerror_r(savedErrno, (char *)errString.data(), kErrTextSize));
+    throw Exception(boost::str(boost::format("System error %s occurred: %s") %
+                               strerror_r(savedErrno, (char *)errString.data(), kErrTextSize) %
+                               context));
 }
+
+void Exception::throwFromErrno() { throwFromErrno(""); }
 
 } // namespace ruralpi
