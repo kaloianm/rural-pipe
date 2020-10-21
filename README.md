@@ -2,7 +2,7 @@
 
 A Raspberry Pi-based client/server system to unify the bandwidth of multiple available networks in order to provide a single high(er) bandwidth network access in rural locations.
 
-## INSTALLATION
+## BUILD
 
 These installation and build instructions assume a development machine (DEV), separate from the Raspberry Pi (RPI), running Ubuntu 20.04.
 
@@ -11,6 +11,11 @@ These installation and build instructions assume a development machine (DEV), se
 1. (On RPI): Install the GDB server on the Raspberry Pi: `sudo apt install gdbserver`
 1. Clone this repository
 1. Run `scons`
+
+## INSTALLATION
+
+1. Follow these (instructions)[https://www.raspberrypi.org/documentation/configuration/wireless/access-point-routed.md] in order to configure the Raspberry Pi as a Wifi router (so it manages its own internal network)
+1. TODO: Instructions to start the client/server
 
 ## ACKNOWLEDGEMENTS
 
