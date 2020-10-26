@@ -15,20 +15,67 @@
 # DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import os
+
 Import('env')
 native_env = env.Clone()
-native_env.Append(CPPPATH=[Dir('.').abspath], LIBPATH=[Dir('.').abspath], CXXFLAGS=['-std=c++14'])
+native_env.Append(CPPPATH=[native_env.Dir('.').abspath])
+native_env.Append(CXXFLAGS=['-std=c++14'])
 
-# Target for Boost (which is shared between the client and server)
-native_env.Command(
-    native_env.Dir('boost_for_client').abspath, None, [
-        Mkdir(native_env.Dir('.')),
-        str(native_env.File('make_boost_for_platform.sh')) + ' ' +
-        native_env.Dir('boost_for_client').abspath + ' ' +
-        ARGUMENTS.get('BOOST_VERSION', '1.74.0') + ' ' + native_env['CLIENT_COMPILER_PREFIX'] +
-        ' > boost_for_client_build.log'
+
+def MakeCommonNativeEnv(arch_name):
+    arch = native_env[arch_name]
+
+    # Boost configuration
+    boost_library_names = [
+        'boost_program_options',
+    ]
+
+    boost_install_directory = native_env.Dir(arch['arch']).abspath
+
+    boost = native_env.Command(
+        list(
+            map(
+                lambda lib: native_env.File(
+                    os.path.join(boost_install_directory, 'boost', 'lib', 'lib' + lib + '.a')),
+                boost_library_names)),
+        native_env.File('make_boost_for_platform.sh'),
+        [
+            '{script_path} {install_directory} {boost_version} {compiler_prefix} > boost_for_{arch}_build.log'
+            .format(
+                script_path=str(native_env.File('make_boost_for_platform.sh')),
+                install_directory=boost_install_directory,
+                boost_version=ARGUMENTS.get('BOOST_VERSION', '1.74.0'),
+                compiler_prefix=arch['prefix'],
+                arch=arch['arch'],
+            ),
+        ],
+    )
+
+    # Common environment configuration
+    env = native_env.Clone()
+    env.Append(CPPPATH=[os.path.join(boost_install_directory, 'boost', 'include')])
+    env.Append(LIBPATH=[
+        os.path.join(boost_install_directory, 'boost', 'lib'),
+        native_env.Dir(arch['arch'])
     ])
+    env.Append(LIBS=[boost_library_names, 'pthread'])
+    for (tool, name) in [
+        ('CXX', 'g++'),
+    ]:
+        env[tool] = arch['prefix'] + name
 
-SConscript('common/SConscript', exports='native_env')
-SConscript('client/SConscript', exports='native_env')
-SConscript('server/SConscript', exports='native_env')
+    # Build the common library
+    common = SConscript('common/SConscript', variant_dir=arch['arch'], exports='env', duplicate=0)
+    return env
+
+
+# Build the Client
+env = MakeCommonNativeEnv('CLIENT_ARCH')
+env.Append(LIBS=['common'])
+SConscript('client/SConscript', exports='env', duplicate=0)
+
+# Build the Server
+env = MakeCommonNativeEnv('SERVER_ARCH')
+env.Append(LIBS=['common'])
+SConscript('server/SConscript', exports='env', duplicate=0)

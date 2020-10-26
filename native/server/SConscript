@@ -15,4 +15,14 @@
 # DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-Import('native_env')
+import os
+
+Import('env')
+
+server = env.Program(
+    target='server',
+    source=[
+        'server_main.cpp',
+    ],
+)
+env.Install(os.path.join(Dir('#').abspath, 'install/server'), [server])

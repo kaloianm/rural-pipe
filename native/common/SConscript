@@ -15,14 +15,12 @@
 # DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-Import('native_env')
-env = native_env.Clone()
-env.Append(CPPPATH=[Dir('../boost_for_client/include')])
+Import('env')
 
-# Change the compiler/liker to match the target architecture
-for (tool, name) in [
-    ('CXX', 'g++'),
-]:
-    env[tool] = env['CLIENT_COMPILER_PREFIX'] + name
-
-env.Library('common', ['exception.cpp'])
+common = env.Library(
+    target='common',
+    source=[
+        'exception.cpp',
+    ],
+)
+Return('common')

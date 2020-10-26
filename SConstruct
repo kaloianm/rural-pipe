@@ -17,18 +17,34 @@
 
 import os
 
-# Define the command-line options for the build
+###################################################################################################
+# BEGIN: command-line options for the build
+#
 
-# --client_target
-client_targets = {
-    'pi': 'arm-linux-gnueabihf-',
-    'pc': '',
+target_choices = {
+    'pc': {
+        'arch': 'pc',
+        'prefix': ''
+    },
+    'pi': {
+        'arch': 'pi',
+        'prefix': 'arm-linux-gnueabihf-'
+    },
 }
-AddOption('--client_target', dest='client_target', type='choice',
-          choices=list(client_targets.keys()), default='pc',
-          help='Use CLIENT_TARGET as the architecture for the client')
 
-env = Environment(ENV=os.environ, CLIENT_COMPILER_PREFIX=client_targets[GetOption('client_target')])
+# --client_arch
+AddOption('--client_arch', dest='client_arch', type='choice', choices=list(target_choices.keys()),
+          default='pc', help='Use CLIENT_ARCH as the architecture for the client')
+
+#
+# END: command-line options for the build
+###################################################################################################
+
+env = Environment(
+    ENV=os.environ,
+    CLIENT_ARCH=target_choices[GetOption('client_arch')],
+    SERVER_ARCH=target_choices['pc'],
+)
 
 SConscript('native/SConscript', exports='env', variant_dir='build/native', duplicate=0)
 SConscript('control/SConscript', exports='env', variant_dir='build/control', duplicate=0)

@@ -47,7 +47,4 @@ echo "Building Boost in $BOOST_ROOT ..."
 pushd $BOOST_ROOT
 ./bootstrap.sh --with-libraries=program_options
 echo "using gcc : platform : /usr/bin/${PLATFORM_PREFIX}g++ : <cxxflags>-std=c++14 ;" > ./tools/build/src/user-config.jam
-./b2 -d+2 --prefix=$EXTRACT_DIR/boost --exec-prefix=$EXTRACT_DIR/boost toolset=gcc-platform link=static install
-
-echo "Installing in $INSTALL_DIR ..."
-mv $EXTRACT_DIR/boost $INSTALL_DIR
+./b2 -d+2 --prefix=$INSTALL_DIR/boost --exec-prefix=$INSTALL_DIR/boost toolset=gcc-platform link=static install
