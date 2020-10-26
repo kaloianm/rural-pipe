@@ -21,6 +21,7 @@ Import('env')
 native_env = env.Clone()
 native_env.Append(CPPPATH=[native_env.Dir('.').abspath])
 native_env.Append(CXXFLAGS=['-std=c++14'])
+native_env.Append(CPPDEFINES=['BOOST_FILESYSTEM_NO_DEPRECATED'])
 
 
 def MakeCommonNativeEnv(arch_name):
@@ -28,7 +29,14 @@ def MakeCommonNativeEnv(arch_name):
 
     # Boost configuration
     boost_library_names = [
+        'boost_atomic',
+        'boost_chrono',
+        'boost_log_setup',
+        'boost_log',
+        'boost_filesystem',
         'boost_program_options',
+        'boost_regex',
+        'boost_thread',
     ]
 
     boost_install_directory = native_env.Dir(arch['arch']).abspath

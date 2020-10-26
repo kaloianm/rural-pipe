@@ -3,5 +3,5 @@ build/
 install/
 
 .sconsign.dblite
-boost_for_client_build.log
-boost_for_server_build.log
+boost_for_pc_build.log
+boost_for_pi_build.log

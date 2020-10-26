@@ -48,9 +48,9 @@ TunCtl::TunCtl(std::string deviceName, int numQueues)
 
     for (int i = 0; i < numQueues; i++) {
         if ((_fileDescriptors.fds[i] = open("/dev/net/tun", O_RDWR)) < 0)
-            Exception::throwFromErrno();
+            Exception::throwFromErrno("While creating tunnel device");
         if (ioctl(_fileDescriptors.fds[i], TUNSETIFF, (void *)&ifr))
-            Exception::throwFromErrno();
+            Exception::throwFromErrno("While configuring tunnel device");
     }
 }
 

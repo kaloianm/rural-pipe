@@ -16,6 +16,10 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#include <boost/log/core.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/log/utility/setup/file.hpp>
 #include <iostream>
 #include <netinet/ip.h>
 #include <thread>
@@ -26,7 +30,24 @@
 namespace ruralpi {
 namespace {
 
+namespace logging = boost::log;
+
+void initLogging() {
+    logging::add_file_log(logging::keywords::file_name = "client_%N.log",
+                          logging::keywords::rotation_size = 10 * 1024 * 1024,
+                          logging::keywords::time_based_rotation =
+                              logging::sinks::file::rotation_at_time_point(0, 0, 0),
+                          logging::keywords::auto_flush = true,
+                          logging::keywords::format = "[%TimeStamp%]: %Message%");
+
+    logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
+
+    logging::add_common_attributes();
+}
+
 void clientMain(Context ctx) {
+    initLogging();
+
     TunCtl tunnel("rpi", ctx.options.nqueues);
 
     std::vector<std::thread> threads;
@@ -37,16 +58,16 @@ void clientMain(Context ctx) {
             std::string buffer(kBufferSize, 0);
             while (true) {
                 int nRead = read(fd, (void *)buffer.data(), kBufferSize);
-
                 const iphdr &ip = *((iphdr *)buffer.data());
-                printf("Read %d bytes: version %d, length %d, protocol %d: \n", nRead, ip.version,
-                       ip.tot_len, ip.protocol);
+                BOOST_LOG_TRIVIAL(debug) << "Read " << nRead << " bytes protocol " << int(ip.protocol);
             }
         });
     }
 
     std::cout << "Rural Pipe client started with " << ctx.options.nqueues << " queues "
               << std::endl;
+    BOOST_LOG_TRIVIAL(info) << "Rural Pipe client started with " << ctx.options.nqueues
+                            << " queues";
 
     for (auto &t : threads) {
         t.join();
@@ -68,7 +89,7 @@ int main(int argc, const char *argv[]) {
         ruralpi::clientMain(std::move(ctx));
         return 0;
     } catch (const std::exception &ex) {
-        std::cerr << "Error occurred: " << std::endl << ex.what() << std::endl;
+        BOOST_LOG_TRIVIAL(fatal) << "Error occurred: " << ex.what();
         return 1;
     }
 }

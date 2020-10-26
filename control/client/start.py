@@ -39,7 +39,12 @@ async def start_client_and_wait(options):
                                                           stderr=asyncio.subprocess.STDOUT)
     first_line = await client_process.stdout.readline()
     if not first_line.decode().startswith('Rural Pipe client started'):
-        process.kill()
+        try:
+            client_process.kill()
+        except:
+            pass
+        print('Failed to start service')
+        return await client_process.wait()
 
     print('Client started and active, configuring routing ...')
 
@@ -56,7 +61,7 @@ async def start_client_and_wait(options):
             break
         print(line.decode())
 
-    return await process.wait()
+    return await client_process.wait()
 
 
 def main():

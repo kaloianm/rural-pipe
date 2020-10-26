@@ -29,15 +29,19 @@ Exception::Exception(std::string message) : _message(std::move(message)) {}
 
 const char *Exception::what() const noexcept { return _message.c_str(); }
 
-void Exception::throwFromErrno(const std::string& context) {
+void Exception::throwFromErrno(const std::string &context) {
     BOOST_ASSERT(errno);
     const int savedErrno = errno;
 
     constexpr size_t kErrTextSize = 4096;
     std::string errString(kErrTextSize, 0);
-    throw Exception(boost::str(boost::format("System error %s occurred: %s") %
-                               strerror_r(savedErrno, (char *)errString.data(), kErrTextSize) %
-                               context));
+    if (context.empty())
+        throw Exception(boost::str(boost::format("System error (%d): %s") % savedErrno %
+                                   strerror_r(savedErrno, (char *)errString.data(), kErrTextSize)));
+    else
+        throw Exception(
+            boost::str(boost::format("(%s): System error (%d): %s") % context % savedErrno %
+                       strerror_r(savedErrno, (char *)errString.data(), kErrTextSize)));
 }
 
 void Exception::throwFromErrno() { throwFromErrno(""); }
