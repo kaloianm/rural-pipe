@@ -16,12 +16,31 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#include <boost/log/core.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/log/utility/setup/file.hpp>
 #include <iostream>
 
 namespace ruralpi {
 namespace {
 
-void serverMain() {}
+namespace logging = boost::log;
+
+void initLogging() {
+    logging::add_file_log(logging::keywords::file_name = "server_%N.log",
+                          logging::keywords::rotation_size = 10 * 1024 * 1024,
+                          logging::keywords::time_based_rotation =
+                              logging::sinks::file::rotation_at_time_point(0, 0, 0),
+                          logging::keywords::auto_flush = true,
+                          logging::keywords::format = "[%TimeStamp%]: %Message%");
+
+    logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
+
+    logging::add_common_attributes();
+}
+
+void serverMain() { initLogging(); }
 
 } // namespace
 } // namespace ruralpi

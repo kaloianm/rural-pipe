@@ -21,6 +21,7 @@ common = env.Library(
     target='common',
     source=[
         'exception.cpp',
+        'ip_parsers.cpp',
     ],
 )
 Return('common')

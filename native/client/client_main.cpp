@@ -21,11 +21,11 @@
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/utility/setup/file.hpp>
 #include <iostream>
-#include <netinet/ip.h>
 #include <thread>
 
 #include "client/context.h"
 #include "client/tun_ctl.h"
+#include "common/ip_parsers.h"
 
 namespace ruralpi {
 namespace {
@@ -58,18 +58,21 @@ void clientMain(Context ctx) {
             std::string buffer(kBufferSize, 0);
             while (true) {
                 int nRead = read(fd, (void *)buffer.data(), kBufferSize);
-                const iphdr &ip = *((iphdr *)buffer.data());
+                const IP &ip = IP::read(buffer.data());
                 switch (ip.protocol) {
                 case IPPROTO_ICMP:
-                    BOOST_LOG_TRIVIAL(debug) << "Read " << nRead << " bytes of ICMP";
+                    BOOST_LOG_TRIVIAL(debug)
+                        << "Read " << nRead << " bytes of ICMP: " << ip.toString()
+                        << ip.as<ICMP>().toString();
                     break;
                 case IPPROTO_TCP:
-                    BOOST_LOG_TRIVIAL(debug) << "Read " << nRead << " bytes of TCP";
+                    BOOST_LOG_TRIVIAL(debug)
+                        << "Read " << nRead << " bytes of TCP: " << ip.toString()
+                        << ip.as<TCP>().toString();
                     break;
                 default:
                     BOOST_LOG_TRIVIAL(warning)
-                        << "Read " << nRead << " bytes of unsupported protocol "
-                        << int(ip.protocol);
+                        << "Read " << nRead << " bytes of unsupported protocol " << ip.toString();
                 }
             }
         });
