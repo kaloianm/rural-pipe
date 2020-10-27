@@ -59,7 +59,18 @@ void clientMain(Context ctx) {
             while (true) {
                 int nRead = read(fd, (void *)buffer.data(), kBufferSize);
                 const iphdr &ip = *((iphdr *)buffer.data());
-                BOOST_LOG_TRIVIAL(debug) << "Read " << nRead << " bytes protocol " << int(ip.protocol);
+                switch (ip.protocol) {
+                case IPPROTO_ICMP:
+                    BOOST_LOG_TRIVIAL(debug) << "Read " << nRead << " bytes of ICMP";
+                    break;
+                case IPPROTO_TCP:
+                    BOOST_LOG_TRIVIAL(debug) << "Read " << nRead << " bytes of TCP";
+                    break;
+                default:
+                    BOOST_LOG_TRIVIAL(warning)
+                        << "Read " << nRead << " bytes of unsupported protocol "
+                        << int(ip.protocol);
+                }
             }
         });
     }
