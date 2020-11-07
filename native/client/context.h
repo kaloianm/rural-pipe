@@ -22,6 +22,7 @@
 #include <boost/program_options/variables_map.hpp>
 
 namespace ruralpi {
+namespace client {
 
 struct Options {
     Options(int argc, const char *argv[]);
@@ -30,6 +31,8 @@ struct Options {
     const auto &desc() const { return _desc; }
 
     int nqueues;
+    std::string serverHost;
+    int serverPort;
 
 private:
     boost::program_options::options_description _desc;
@@ -42,4 +45,5 @@ struct Context {
     const Options options;
 };
 
+} // namespace client
 } // namespace ruralpi

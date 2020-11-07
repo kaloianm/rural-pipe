@@ -18,32 +18,30 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/variables_map.hpp>
 
 namespace ruralpi {
-namespace client {
+namespace server {
 
-/**
- * Creates the 'tun' device on construction (or throws) and closes it at destruction time.
- */
-class TunCtl {
-public:
-    TunCtl(std::string deviceName, int numQueues);
+struct Options {
+    Options(int argc, const char *argv[]);
 
-    int operator[](int idx) const;
+    bool help() const;
+    const auto &desc() const { return _desc; }
+
+    int port;
 
 private:
-    const std::string _deviceName;
-
-    struct ScopedFileDescriptors {
-        ScopedFileDescriptors(int numDescriptorsToAlloc);
-        ~ScopedFileDescriptors();
-
-        std::vector<int> fds;
-    };
-    ScopedFileDescriptors _fileDescriptors;
+    boost::program_options::options_description _desc;
+    boost::program_options::variables_map _vm;
 };
 
-} // namespace client
+struct Context {
+    explicit Context(Options options);
+
+    const Options options;
+};
+
+} // namespace server
 } // namespace ruralpi

@@ -22,7 +22,10 @@
 #include <boost/log/utility/setup/file.hpp>
 #include <iostream>
 
+#include "server/context.h"
+
 namespace ruralpi {
+namespace server {
 namespace {
 
 namespace logging = boost::log;
@@ -40,17 +43,32 @@ void initLogging() {
     logging::add_common_attributes();
 }
 
-void serverMain() { initLogging(); }
+void serverMain(Context ctx) {
+    initLogging();
+
+    BOOST_LOG_TRIVIAL(info) << "Rural Pipe server starting on port " << ctx.options.port;
+
+    std::cout << "Rural Pipe server running" << std::endl; // Required by the startup script
+    BOOST_LOG_TRIVIAL(info) << "Rural Pipe server running";
+}
 
 } // namespace
+} // namespace server
 } // namespace ruralpi
 
 int main(int argc, const char *argv[]) {
     try {
-        ruralpi::serverMain();
+        ruralpi::server::Context ctx(ruralpi::server::Options(argc, argv));
+
+        if (ctx.options.help()) {
+            std::cout << ctx.options.desc();
+            return 1;
+        }
+
+        ruralpi::server::serverMain(std::move(ctx));
         return 0;
     } catch (const std::exception &ex) {
-        std::cerr << "Error occurred: " << std::endl << ex.what() << std::endl;
+        BOOST_LOG_TRIVIAL(fatal) << "Error occurred: " << ex.what();
         return 1;
     }
 }

@@ -22,6 +22,7 @@ Import('env')
 server = env.Program(
     target='server',
     source=[
+        'context.cpp',
         'server_main.cpp',
     ],
 )

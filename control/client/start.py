@@ -38,7 +38,8 @@ async def start_client_and_wait(options):
                                                           stdout=asyncio.subprocess.PIPE,
                                                           stderr=asyncio.subprocess.STDOUT)
     first_line = await client_process.stdout.readline()
-    if not first_line.decode().startswith('Rural Pipe client started'):
+    if not first_line.decode().startswith('Rural Pipe client running'):
+        print('Received unexpected response from the process:', first_line.decode())
         try:
             client_process.kill()
         except:
@@ -65,15 +66,14 @@ async def start_client_and_wait(options):
 
 
 def main():
+    os.chdir(sys.path[0])
+
     config = ConfigParser()
-    config_files_read = config.read(
-        [os.path.join('.', 'client.cfg'),
-         os.path.join(sys.path[0], 'client.cfg')])
-    print('Loaded configuration from: ', config_files_read)
+    config_files_read = config.read('client.cfg')
 
     parser = OptionParser()
     parser.add_option('--bindip', dest='bind_ip', help='IP address to which to bind the network',
-                      default=config.get('DEFAULT', 'bindip'))
+                      default=config.get('settings', 'bindip'))
 
     (options, args) = parser.parse_args()
     sys.exit(asyncio.run(start_client_and_wait(options)))

@@ -29,6 +29,7 @@
 #include "common/exception.h"
 
 namespace ruralpi {
+namespace client {
 namespace {
 
 const char kDeviceName[] = "RPI";
@@ -65,4 +66,5 @@ TunCtl::ScopedFileDescriptors::~ScopedFileDescriptors() {
     }
 }
 
+}
 } // namespace ruralpi

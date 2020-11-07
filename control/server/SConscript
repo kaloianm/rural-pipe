@@ -19,3 +19,8 @@ import os
 
 Import('control_env')
 env = control_env.Clone()
+
+env.Command(os.path.join(Dir('#').abspath, 'install/server/start.py'), 'start.py',
+            Copy('$TARGET', '$SOURCE'))
+env.Command(os.path.join(Dir('#').abspath, 'install/server/server.cfg'),
+            'default_server_config.cfg', Copy('$TARGET', '$SOURCE'))

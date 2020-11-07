@@ -21,6 +21,8 @@
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/utility/setup/file.hpp>
 #include <iostream>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <thread>
 
 #include "client/context.h"
@@ -28,6 +30,7 @@
 #include "common/ip_parsers.h"
 
 namespace ruralpi {
+namespace client {
 namespace {
 
 namespace logging = boost::log;
@@ -47,6 +50,12 @@ void initLogging() {
 
 void clientMain(Context ctx) {
     initLogging();
+
+    BOOST_LOG_TRIVIAL(info) << "Rural Pipe client starting with server " << ctx.options.serverHost
+                            << ':' << ctx.options.serverPort << " and " << ctx.options.nqueues
+                            << " queues";
+
+    // Connect to the server
 
     TunCtl tunnel("rpi", ctx.options.nqueues);
 
@@ -78,10 +87,8 @@ void clientMain(Context ctx) {
         });
     }
 
-    std::cout << "Rural Pipe client started with " << ctx.options.nqueues << " queues "
-              << std::endl;
-    BOOST_LOG_TRIVIAL(info) << "Rural Pipe client started with " << ctx.options.nqueues
-                            << " queues";
+    std::cout << "Rural Pipe client running" << std::endl; // Required by the startup script
+    BOOST_LOG_TRIVIAL(info) << "Rural Pipe client running";
 
     for (auto &t : threads) {
         t.join();
@@ -89,18 +96,19 @@ void clientMain(Context ctx) {
 }
 
 } // namespace
+} // namespace client
 } // namespace ruralpi
 
 int main(int argc, const char *argv[]) {
     try {
-        ruralpi::Context ctx(ruralpi::Options(argc, argv));
+        ruralpi::client::Context ctx(ruralpi::client::Options(argc, argv));
 
         if (ctx.options.help()) {
             std::cout << ctx.options.desc();
             return 1;
         }
 
-        ruralpi::clientMain(std::move(ctx));
+        ruralpi::client::clientMain(std::move(ctx));
         return 0;
     } catch (const std::exception &ex) {
         BOOST_LOG_TRIVIAL(fatal) << "Error occurred: " << ex.what();

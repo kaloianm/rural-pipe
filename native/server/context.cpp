@@ -1,3 +1,4 @@
+
 /**
  * Copyright 2020 Kaloian Manassiev
  *
@@ -16,34 +17,36 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
-#pragma once
+#include "server/context.h"
 
-#include <string>
-#include <vector>
+#include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
 
 namespace ruralpi {
-namespace client {
+namespace server {
 
-/**
- * Creates the 'tun' device on construction (or throws) and closes it at destruction time.
- */
-class TunCtl {
-public:
-    TunCtl(std::string deviceName, int numQueues);
+namespace fs = boost::filesystem;
+namespace po = boost::program_options;
 
-    int operator[](int idx) const;
+Context::Context(Options options) : options(std::move(options)) {}
 
-private:
-    const std::string _deviceName;
+Options::Options(int argc, const char *argv[]) : _desc("Server options") {
+    // clang-format off
+    _desc.add_options()
+        ("help", "Produces this help message")
+        ("settings.port", po::value<int>()->default_value(50003), "Port on which to listen for connections")
+    ;
+    // clang-format on
 
-    struct ScopedFileDescriptors {
-        ScopedFileDescriptors(int numDescriptorsToAlloc);
-        ~ScopedFileDescriptors();
+    const fs::path configPath(fs::current_path() / fs::path("server.cfg"));
+    po::store(po::parse_config_file(configPath.c_str(), _desc, true /* allow_unregistered */), _vm);
+    po::store(po::parse_command_line(argc, argv, _desc), _vm);
+    po::notify(_vm);
 
-        std::vector<int> fds;
-    };
-    ScopedFileDescriptors _fileDescriptors;
-};
+    port = _vm["settings.port"].as<int>();
+}
 
-} // namespace client
+bool Options::help() const { return _vm.count("help"); }
+
+} // namespace server
 } // namespace ruralpi

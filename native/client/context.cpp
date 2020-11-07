@@ -19,27 +19,39 @@
 
 #include "client/context.h"
 
-#include <boost/program_options/parsers.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
+#include <iostream>
 
 namespace ruralpi {
+namespace client {
+
+namespace fs = boost::filesystem;
+namespace po = boost::program_options;
 
 Context::Context(Options options) : options(std::move(options)) {}
-
-namespace po = boost::program_options;
 
 Options::Options(int argc, const char *argv[]) : _desc("Client options") {
     // clang-format off
     _desc.add_options()
         ("help", "Produces this help message")
-        ("nqueues", po::value<int>()->default_value(1), "Number of queues/threads to instantiate");
+        ("settings.nqueues", po::value<int>()->default_value(1), "Number of queues/threads to instantiate")
+        ("settings.serverHost", po::value<std::string>()->required(), "Host on which the server is listening for connections")
+        ("settings.serverPort", po::value<int>()->default_value(50003), "Port on which the server is listening for connections")
+    ;
     // clang-format on
 
+    const fs::path configPath(fs::current_path() / fs::path("client.cfg"));
+    po::store(po::parse_config_file(configPath.c_str(), _desc, true /* allow_unregistered */), _vm);
     po::store(po::parse_command_line(argc, argv, _desc), _vm);
     po::notify(_vm);
 
-    nqueues = _vm["nqueues"].as<int>();
+    nqueues = _vm["settings.nqueues"].as<int>();
+    serverHost = _vm["settings.serverHost"].as<std::string>();
+    serverPort = _vm["settings.serverPort"].as<int>();
 }
 
 bool Options::help() const { return _vm.count("help"); }
 
+} // namespace client
 } // namespace ruralpi
