@@ -31,6 +31,7 @@ if os.geteuid() != 0:
 WAN = 'eth0'
 LAN = 'eth1'
 WLAN24GHZ = 'wlan0'
+TUNNEL = 'tun0'
 
 parser = argparse.ArgumentParser(description="""
 This script performs all the necessary configuration steps for a clean-installed Raspberry Pi 4
@@ -52,7 +53,7 @@ def shell_command(command):
 # Rewrites the entire content of file_name with contents.
 def rewrite_config_file(file_name, contents):
     file_name_for_backup = file_name + '.rural-pipe.orig'
-    shell_command(f'[ -f {file_name_for_backup} ] || cp {file_name} {file_name_for_backup}')
+    shell_command(f'[ ! -f {file_name} ] || cp {file_name} {file_name_for_backup}')
 
     with open(file_name, 'wt') as file:
         file.write(f"""
@@ -114,7 +115,7 @@ shell_command(
     'echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections'
 )
 shell_command(
-    'apt install -y vim screen dnsmasq hostapd netfilter-persistent iptables-persistent bridge-utils'
+    'apt install -y vim screen dnsmasq hostapd netfilter-persistent iptables-persistent bridge-utils openvpn'
 )
 
 # 2. Unblock the WLAN device(s) so they can transmit.
@@ -184,5 +185,29 @@ shell_command('sudo systemctl enable hostapd')
 
 # 6. Enable IP forwarding and NAT
 set_config_option('/etc/sysctl.conf', 'net.ipv4.ip_forward=1')
-shell_command('iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE')
+shell_command(f'iptables -t nat -A POSTROUTING -o {WAN} -j MASQUERADE')
+shell_command(f'iptables -t nat -A POSTROUTING -o {TUNNEL} -j MASQUERADE')
 shell_command('netfilter-persistent save')
+
+# 7. Manual instructions for enabling USB Tethering with an Android Phone
+#
+# TODO: Automate these instructions
+#
+# Plug phone into the USB port of the Android device and select "Internet Connection Sharing"
+# instead of only charging, on the phone. This should show up the phone as a network
+# interface called usb0 when `sudo ifconfig -a` is run.
+#
+# Bring the device up by running `sudo ifconfig usb0 up` and have it acquire DHCP credentials and
+# set-up routing by running `sudo dhclient usb0`. After this, the phone should be set as a gateway
+# on the Raspberry Pi.
+
+# 8. Manual instructions for using OpenVPN with NordVPN
+#
+# TODO: Automate these instructions
+#
+# Follow the manual (OpenVPN) instructions [here](https://support.nordvpn.com/Connectivity/Linux/1047409422/How-can-I-connect-to-NordVPN-using-Linux-Terminal.htm).
+#
+# Create a file with the NordVPN credentials as `$HOME/.nordvpn_cred`: First line is the user name,
+# second line is the password.
+#
+# Connect using the following command line: `sudo openvpn --config /etc/openvpn/ovpn_udp/es63.nordvpn.com.udp.ovpn --auth-user-pass ~/.nordvpn_cred`.
