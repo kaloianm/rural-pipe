@@ -115,7 +115,7 @@ shell_command(
     'echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections'
 )
 shell_command(
-    'apt install -y vim screen dnsmasq hostapd netfilter-persistent iptables-persistent bridge-utils openvpn'
+    'apt install -y vim screen dnsmasq hostapd netfilter-persistent iptables-persistent bridge-utils openvpn libqmi-utils'
 )
 
 # 2. Unblock the WLAN device(s) so they can transmit.
@@ -162,11 +162,11 @@ rewrite_config_file(
     '/etc/hostapd/hostapd.conf', f"""
 interface={WLAN24GHZ}
 bridge=br0
-hw_mode=g
-channel=10
+hw_mode=a
+ieee80211n=1
+channel=36
 ieee80211d=1
 country_code=ES
-ieee80211n=1
 wmm_enabled=1
 
 ssid=RuralPipe
