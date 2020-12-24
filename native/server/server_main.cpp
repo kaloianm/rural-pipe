@@ -16,12 +16,18 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#include <boost/asio/ip/address.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/utility/setup/file.hpp>
-#include <iostream>
+#include <netinet/in.h>
+#include <sys/socket.h>
 
+#include "common/exception.h"
+#include "common/socket_producer_consumer.h"
+#include "common/tun_ctl.h"
+#include "common/tunnel_producer_consumer.h"
 #include "server/context.h"
 
 namespace ruralpi {
@@ -46,10 +52,54 @@ void initLogging() {
 void serverMain(Context ctx) {
     initLogging();
 
-    BOOST_LOG_TRIVIAL(info) << "Rural Pipe server starting on port " << ctx.options.port;
+    BOOST_LOG_TRIVIAL(info) << "Rural Pipe server starting on port " << ctx.options.port << " with "
+                            << ctx.options.nqueues << " queues";
 
-    std::cout << "Rural Pipe server running" << std::endl; // Required by the startup script
+    // Create the server-side Tunnel device
+    TunCtl tunnel("rpi", ctx.options.nqueues);
+    TunnelProducerConsumer tunnelPC(tunnel.getQueues());
+    SocketProducerConsumer socketPC(false /* isClient */);
+    tunnelPC.pipeTo(socketPC);
+    tunnelPC.start();
+
+    // Start listening for connections
+    int serverSock = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSock == 0)
+        Exception::throwFromErrno("Failed to create socket");
+
+    {
+        sockaddr_in address;
+        address.sin_family = AF_INET;
+        address.sin_addr.s_addr = INADDR_ANY;
+        address.sin_port = htons(ctx.options.port);
+
+        if (bind(serverSock, (sockaddr *)&address, sizeof(address)) < 0)
+            Exception::throwFromErrno("Failed to bind to port");
+    }
+
+    std::cout << "Rural Pipe server running" << std::endl; // Indicates to the startup script that
+                                                           // the tunnel device has been created and
+                                                           // that it can configure the routing
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe server running";
+
+    // Only returns on shutdown or fatal errors
+    while (true) {
+        if (listen(serverSock, 1) < 0)
+            Exception::throwFromErrno("Failed to listen on port");
+
+        sockaddr_in address;
+        int addrlen;
+        int clientSocket = accept(serverSock, (struct sockaddr *)&address, (socklen_t *)&addrlen);
+        if (clientSocket < 0) {
+            BOOST_LOG_TRIVIAL(info) << "Failed to accept connection";
+            continue;
+        }
+
+        auto addr = boost::asio::ip::address_v4(ntohl(address.sin_addr.s_addr));
+        BOOST_LOG_TRIVIAL(info) << "Accepted connection from " << addr;
+
+        socketPC.addSocket(SocketProducerConsumer::SocketConfig{addr.to_string(), clientSocket});
+    }
 }
 
 } // namespace

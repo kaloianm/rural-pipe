@@ -16,20 +16,20 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
-#include "client/tun_ctl.h"
+#include "common/tun_ctl.h"
 
 #include <fcntl.h>
 #include <linux/if.h>
 #include <linux/if_tun.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 
-#include "client/context.h"
 #include "common/exception.h"
 
 namespace ruralpi {
-namespace client {
 namespace {
 
 const char kDeviceName[] = "RPI";
@@ -55,7 +55,7 @@ TunCtl::TunCtl(std::string deviceName, int numQueues)
     }
 }
 
-int TunCtl::operator[](int idx) const { return _fileDescriptors.fds[idx]; }
+std::vector<int> TunCtl::getQueues() const { return _fileDescriptors.fds; }
 
 TunCtl::ScopedFileDescriptors::ScopedFileDescriptors(int numDescriptorsToAlloc)
     : fds(numDescriptorsToAlloc, -1) {}
@@ -66,5 +66,4 @@ TunCtl::ScopedFileDescriptors::~ScopedFileDescriptors() {
     }
 }
 
-}
 } // namespace ruralpi

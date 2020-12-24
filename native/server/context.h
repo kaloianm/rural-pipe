@@ -30,6 +30,7 @@ struct Options {
     bool help() const;
     const auto &desc() const { return _desc; }
 
+    int nqueues;
     int port;
 
 private:

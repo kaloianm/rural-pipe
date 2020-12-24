@@ -35,7 +35,7 @@ Options::Options(int argc, const char *argv[]) : _desc("Client options") {
     // clang-format off
     _desc.add_options()
         ("help", "Produces this help message")
-        ("settings.nqueues", po::value<int>()->default_value(1), "Number of queues/threads to instantiate")
+        ("settings.nqueues", po::value<int>()->default_value(1), "Number of queues/threads to instantiate to listen on the tunnel device")
         ("settings.serverHost", po::value<std::string>()->required(), "Host on which the server is listening for connections")
         ("settings.serverPort", po::value<int>()->default_value(50003), "Port on which the server is listening for connections")
     ;

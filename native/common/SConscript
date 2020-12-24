@@ -22,6 +22,10 @@ common = env.Library(
     source=[
         'exception.cpp',
         'ip_parsers.cpp',
+        'socket_producer_consumer.cpp',
+        'tun_ctl.cpp',
+        'tunnel_frame.cpp',
+        'tunnel_producer_consumer.cpp',
     ],
 )
 Return('common')

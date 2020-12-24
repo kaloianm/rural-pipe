@@ -20,14 +20,11 @@
 #include <boost/log/trivial.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/utility/setup/file.hpp>
-#include <iostream>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <thread>
 
 #include "client/context.h"
-#include "client/tun_ctl.h"
-#include "common/ip_parsers.h"
+#include "common/socket_producer_consumer.h"
+#include "common/tun_ctl.h"
+#include "common/tunnel_producer_consumer.h"
 
 namespace ruralpi {
 namespace client {
@@ -55,44 +52,17 @@ void clientMain(Context ctx) {
                             << ':' << ctx.options.serverPort << " and " << ctx.options.nqueues
                             << " queues";
 
-    // Connect to the server
-
+    // Create the client-side Tunnel device
     TunCtl tunnel("rpi", ctx.options.nqueues);
+    TunnelProducerConsumer tunnelPC(tunnel.getQueues());
+    SocketProducerConsumer socketPC(true /* isClient */);
+    tunnelPC.pipeTo(socketPC);
+    tunnelPC.start();
 
-    std::vector<std::thread> threads;
-    for (int i = 0; i < ctx.options.nqueues; i++) {
-        threads.emplace_back([&tunnel, queueId = i] {
-            int fd = tunnel[queueId];
-            constexpr int kBufferSize = 4096;
-            std::string buffer(kBufferSize, 0);
-            while (true) {
-                int nRead = read(fd, (void *)buffer.data(), kBufferSize);
-                const IP &ip = IP::read(buffer.data());
-                switch (ip.protocol) {
-                case IPPROTO_ICMP:
-                    BOOST_LOG_TRIVIAL(debug)
-                        << "Read " << nRead << " bytes of ICMP: " << ip.toString()
-                        << ip.as<ICMP>().toString();
-                    break;
-                case IPPROTO_TCP:
-                    BOOST_LOG_TRIVIAL(debug)
-                        << "Read " << nRead << " bytes of TCP: " << ip.toString()
-                        << ip.as<TCP>().toString();
-                    break;
-                default:
-                    BOOST_LOG_TRIVIAL(warning)
-                        << "Read " << nRead << " bytes of unsupported protocol " << ip.toString();
-                }
-            }
-        });
-    }
-
-    std::cout << "Rural Pipe client running" << std::endl; // Required by the startup script
+    std::cout << "Rural Pipe client running" << std::endl; // Indicates to the startup script that
+                                                           // the tunnel device has been created and
+                                                           // that it can configure the routing
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe client running";
-
-    for (auto &t : threads) {
-        t.join();
-    }
 }
 
 } // namespace

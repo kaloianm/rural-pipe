@@ -24,7 +24,6 @@ client = env.Program(
     source=[
         'client_main.cpp',
         'context.cpp',
-        'tun_ctl.cpp',
     ],
 )
 env.Install(os.path.join(Dir('#').abspath, 'install/client'), [client])

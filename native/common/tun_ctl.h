@@ -22,19 +22,24 @@
 #include <vector>
 
 namespace ruralpi {
-namespace client {
 
 /**
- * Creates the 'tun' device on construction (or throws) and closes it at destruction time.
+ * Creates the Tunnel device on construction (or throws) and closes all created file descriptors at
+ * destruction time.
  */
 class TunCtl {
+    TunCtl(TunCtl &) = delete;
+
 public:
     TunCtl(std::string deviceName, int numQueues);
 
-    int operator[](int idx) const;
+    /**
+     * Returns the set of file descriptors mapped to this tunnel device's queues.
+     */
+    std::vector<int> getQueues() const;
 
 private:
-    const std::string _deviceName;
+    std::string _deviceName;
 
     struct ScopedFileDescriptors {
         ScopedFileDescriptors(int numDescriptorsToAlloc);
@@ -45,5 +50,4 @@ private:
     ScopedFileDescriptors _fileDescriptors;
 };
 
-} // namespace client
 } // namespace ruralpi

@@ -34,6 +34,7 @@ Options::Options(int argc, const char *argv[]) : _desc("Server options") {
     // clang-format off
     _desc.add_options()
         ("help", "Produces this help message")
+        ("settings.nqueues", po::value<int>()->default_value(1), "Number of queues/threads to instantiate to listen on the tunnel device")
         ("settings.port", po::value<int>()->default_value(50003), "Port on which to listen for connections")
     ;
     // clang-format on
@@ -43,6 +44,7 @@ Options::Options(int argc, const char *argv[]) : _desc("Server options") {
     po::store(po::parse_command_line(argc, argv, _desc), _vm);
     po::notify(_vm);
 
+    nqueues = _vm["settings.nqueues"].as<int>();
     port = _vm["settings.port"].as<int>();
 }
 
