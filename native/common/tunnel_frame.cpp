@@ -24,6 +24,9 @@
 #include "common/exception.h"
 
 namespace ruralpi {
+
+using boost::format;
+
 namespace {
 
 const uint8_t kVersion = 1;
@@ -34,7 +37,7 @@ TunnelFrameReader::TunnelFrameReader(uint8_t const *data, size_t size)
     : _begin(data), _current(_begin), _end(_begin + size) {
     const auto &hdr = header();
     if (hdr.desc.version != kVersion)
-        throw Exception("Unrecognised tunnel frame version");
+        throw Exception(format("Unrecognised tunnel frame version %1%") % hdr.desc.version);
 }
 
 bool TunnelFrameReader::next() {
@@ -54,17 +57,25 @@ void TunnelFrameWriter::onDatagramWritten(size_t size) {
     _current += sizeof(TunnelFrameDatagramSeparator) + size;
 }
 
-size_t TunnelFrameWriter::close(uint64_t seqNum) {
+void TunnelFrameWriter::close(uint64_t seqNum) {
     onDatagramWritten(0);
 
     auto &hdr = *((TunnelFrameHeader *)_begin);
     hdr.desc.version = kVersion;
     hdr.desc.flags = 0;
+    hdr.desc.size = totalSize();
     // TODO: Properly populate the signature field
     strcpy((char *)&hdr.signature, "---- RURAL PIPE SIGNATURE ----");
     hdr.seqNum = seqNum;
+}
 
-    return _current - _begin - 1;
+void TunnelFrameWriter::appendBytes(uint8_t const *ptr, size_t size) {
+    memcpy((void *)data(), (void *)ptr, size);
+    onDatagramWritten(size);
+}
+
+void TunnelFrameWriter::appendString(const char str[]) {
+    appendBytes((uint8_t const *)str, strlen(str) + 1);
 }
 
 TunnelFramePipe::TunnelFramePipe() = default;

@@ -25,6 +25,7 @@
 #include "common/exception.h"
 #include "common/socket_producer_consumer.h"
 #include "common/tunnel_frame.h"
+#include "common/tunnel_frame_stream.h"
 #include "common/tunnel_producer_consumer.h"
 
 namespace ruralpi {
@@ -41,13 +42,13 @@ void tunnelFrameTests() {
 
     TunnelFrameWriter writer(buffer, kTunnelFrameMaxSize);
     LOG << writer.remainingBytes();
-    strcpy((char *)writer.data(), "DG1");
-    writer.onDatagramWritten(sizeof("DG1") + 1);
+    writer.appendString("DG1");
     LOG << writer.remainingBytes();
-    strcpy((char *)writer.data(), "DG2");
-    writer.onDatagramWritten(sizeof("DG2") + 1);
+    writer.appendString("DG2");
     LOG << writer.remainingBytes();
     writer.close(0);
+    assert(writer.totalSize() > 0);
+    LOG << writer.totalSize();
 
     TunnelFrameReader reader(buffer, kTunnelFrameMaxSize);
     assert(reader.header().seqNum == 0);
@@ -71,7 +72,12 @@ struct Fifo {
             Exception::throwFromErrno("Unable to open the Fifo device");
     }
 
-    int fd;
+    ~Fifo() {
+        if (fd > 0)
+            close(fd);
+    }
+
+    int fd{-1};
 };
 
 void tunnelProducerConsumerTests() {
@@ -79,16 +85,16 @@ void tunnelProducerConsumerTests() {
     TunnelProducerConsumer tunnelPC(std::vector<int>{pipes[0].fd, pipes[1].fd});
 
     struct TestPipe : public TunnelFramePipe {
-        void onTunnelFrameReady(void const *data, size_t size) override {
-            LOG << "Received a frame of " << size << " bytes";
+        void onTunnelFrameReady(TunnelFrameReader reader) override {
+            LOG << "Received a frame of " << reader.totalSize() << " bytes";
 
             std::lock_guard<std::mutex> lg(mutex);
             ++numFramesReceived;
-            memcpy(lastFrameReceived, data, size);
-            lastFrameReceivedSize = size;
+            memcpy(lastFrameReceived, reader.begin(), reader.totalSize());
+            lastFrameReceivedSize = reader.totalSize();
         }
 
-        void sendFrameBack(void const *data, size_t size) { _pipe->onTunnelFrameReady(data, size); }
+        void sendFrameBack(TunnelFrameReader reader) { _pipe->onTunnelFrameReady(reader); }
 
         std::mutex mutex;
         int numFramesReceived{0};
@@ -113,17 +119,72 @@ void tunnelProducerConsumerTests() {
     LOG << (char *)reader.data();
     assert(!reader.next());
 
-    testPipe.sendFrameBack(testPipe.lastFrameReceived, testPipe.lastFrameReceivedSize);
+    testPipe.sendFrameBack(
+        TunnelFrameReader(testPipe.lastFrameReceived, testPipe.lastFrameReceivedSize));
 
     tunnelPC.stop();
     tunnelPC.unPipe();
 }
 
-void socketProducerConsumerTests() {}
+void tunnelFrameStreamTests() {
+    uint8_t buffer[kTunnelFrameMaxSize];
+    Fifo pipe;
+    TunnelFrameStream stream(pipe.fd);
+
+    // Send/receive
+    {
+        stream.send([&] {
+            TunnelFrameWriter writer(buffer, sizeof(buffer));
+            writer.appendString("DG1");
+            writer.close(0);
+            return writer;
+        }());
+
+        auto reader = stream.receive();
+        assert(reader.header().seqNum == 0);
+        assert(reader.next());
+        LOG << (char *)reader.data();
+        assert(!reader.next());
+    }
+
+    // Send/receive of a partial frame
+    {
+        TunnelFrameWriter writer(buffer, sizeof(buffer));
+        for (int i = 0; i < 10; i++) {
+            writer.appendString("Longer datagram content; Longer datagram content; Longer datagram "
+                                "content; Longer datagram content; Longer datagram content; Longer "
+                                "datagram content");
+        }
+        writer.close(0);
+        LOG << "Size " << writer.totalSize();
+        assert(write(pipe.fd, writer.begin(), 100) == 100);
+        assert(write(pipe.fd, writer.begin() + 100, writer.totalSize() - 100) ==
+               writer.totalSize() - 100);
+        auto reader = stream.receive();
+        assert(reader.header().seqNum == 0);
+        for (int i = 0; i < 10; i++) {
+            assert(reader.next());
+            LOG << (char *)reader.data();
+        }
+        assert(!reader.next());
+    }
+}
+
+void socketProducerConsumerTests() {
+    Fifo pipes[2];
+    SocketProducerConsumer socketPC(true /* isClient */);
+
+    struct TestPipe : public TunnelFramePipe {
+        void onTunnelFrameReady(TunnelFrameReader reader) override {}
+    } testPipe;
+}
 
 void serverTestsMain() {
     BOOST_LOG_TRIVIAL(info) << "Running TunnelFrame tests ...";
     tunnelFrameTests();
+
+    BOOST_LOG_TRIVIAL(info) << "Running TunnelFrameStream tests ...";
+    tunnelFrameStreamTests();
 
     BOOST_LOG_TRIVIAL(info) << "Running TunnelProducerConsumer tests ...";
     tunnelProducerConsumerTests();

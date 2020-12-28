@@ -16,12 +16,16 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#include <arpa/inet.h>
+#include <boost/asio/ip/address.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/utility/setup/file.hpp>
+#include <sys/socket.h>
 
 #include "client/context.h"
+#include "common/exception.h"
 #include "common/socket_producer_consumer.h"
 #include "common/tun_ctl.h"
 #include "common/tunnel_producer_consumer.h"
@@ -58,6 +62,26 @@ void clientMain(Context ctx) {
     SocketProducerConsumer socketPC(true /* isClient */);
     tunnelPC.pipeTo(socketPC);
     tunnelPC.start();
+
+    // Connect to the server
+    while (true) {
+        int sock = socket(AF_INET, SOCK_STREAM, 0);
+        if (sock < 0)
+            Exception::throwFromErrno("Failed to create socket");
+
+        struct sockaddr_in addr;
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = 0;
+        addr.sin_port = htons(ctx.options.serverPort);
+
+        auto addr_v4 = boost::asio::ip::address_v4(ntohl(addr.sin_addr.s_addr));
+        BOOST_LOG_TRIVIAL(info) << "Accepted connection from " << addr_v4;
+
+        if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+            Exception::throwFromErrno("Failed to connect to server");
+
+        socketPC.addSocket(SocketProducerConsumer::SocketConfig{addr_v4.to_string(), sock});
+    }
 
     std::cout << "Rural Pipe client running" << std::endl; // Indicates to the startup script that
                                                            // the tunnel device has been created and

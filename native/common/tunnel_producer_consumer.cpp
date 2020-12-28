@@ -97,9 +97,7 @@ void TunnelProducerConsumer::stop() {
     }
 }
 
-void TunnelProducerConsumer::onTunnelFrameReady(void const *data, size_t size) {
-    TunnelFrameReader reader((uint8_t const *)data, size);
-
+void TunnelProducerConsumer::onTunnelFrameReady(TunnelFrameReader reader) {
     while (reader.next()) {
         debugLogDatagram(reader.data(), reader.size());
 
@@ -176,7 +174,8 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(int tunnelFd) {
             ++numDatagramsWritten;
         }
 
-        _pipe->onTunnelFrameReady(buffer, writer.close(_seqNum.fetch_add(1)));
+        writer.close(_seqNum.fetch_add(1));
+        _pipe->onTunnelFrameReady(TunnelFrameReader(writer.begin(), writer.totalSize()));
     }
 }
 

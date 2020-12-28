@@ -16,35 +16,26 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
-#include "common/exception.h"
+#pragma once
 
-#include <boost/format.hpp>
-#include <errno.h>
-#include <string.h>
+#include "common/tunnel_frame.h"
 
 namespace ruralpi {
 
-Exception::Exception(std::string message) : _message(std::move(message)) {}
+class TunnelFrameStream {
+public:
+    // An established file descriptor, whose lifetime is owned by the tunnel frame stream after
+    // construction
+    TunnelFrameStream(int fd);
+    ~TunnelFrameStream();
 
-Exception::Exception(boost::format formatter) : Exception(formatter.str()) {}
+    void send(const TunnelFrameWriter &writer);
+    TunnelFrameReader receive();
 
-const char *Exception::what() const noexcept { return _message.c_str(); }
+private:
+    int _fd;
 
-void Exception::throwFromErrno(const std::string &context) {
-    BOOST_ASSERT(errno);
-    const int savedErrno = errno;
-
-    constexpr size_t kErrTextSize = 4096;
-    std::string errString(kErrTextSize, 0);
-    if (context.empty())
-        throw Exception(boost::str(boost::format("System error (%d): %s") % savedErrno %
-                                   strerror_r(savedErrno, (char *)errString.data(), kErrTextSize)));
-    else
-        throw Exception(
-            boost::str(boost::format("(%s): System error (%d): %s") % context % savedErrno %
-                       strerror_r(savedErrno, (char *)errString.data(), kErrTextSize)));
-}
-
-void Exception::throwFromErrno() { throwFromErrno(""); }
+    uint8_t _buffer[kTunnelFrameMaxSize];
+};
 
 } // namespace ruralpi

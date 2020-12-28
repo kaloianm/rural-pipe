@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <boost/assert.hpp>
+#include <boost/format.hpp>
 #include <exception>
 #include <string>
 
@@ -26,10 +28,11 @@ namespace ruralpi {
 class Exception : public std::exception {
 public:
     Exception(std::string message);
+    Exception(boost::format formatter);
 
     const char *what() const noexcept override;
 
-    static void throwFromErrno(const std::string& context);
+    static void throwFromErrno(const std::string &context);
     static void throwFromErrno();
 
 private:

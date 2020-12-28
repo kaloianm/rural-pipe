@@ -41,7 +41,7 @@ public:
 
 private:
     // TunnelFramePipe methods
-    void onTunnelFrameReady(void const *data, size_t size) override;
+    void onTunnelFrameReady(TunnelFrameReader reader) override;
 
     /**
      * One of these functions runs on a separate thread per tunnel file descriptor (from

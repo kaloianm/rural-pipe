@@ -62,18 +62,18 @@ void serverMain(Context ctx) {
     tunnelPC.pipeTo(socketPC);
     tunnelPC.start();
 
-    // Start listening for connections
+    // Bund to the server's listening port
     int serverSock = socket(AF_INET, SOCK_STREAM, 0);
     if (serverSock == 0)
         Exception::throwFromErrno("Failed to create socket");
 
     {
-        sockaddr_in address;
-        address.sin_family = AF_INET;
-        address.sin_addr.s_addr = INADDR_ANY;
-        address.sin_port = htons(ctx.options.port);
+        sockaddr_in addr;
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = INADDR_ANY;
+        addr.sin_port = htons(ctx.options.port);
 
-        if (bind(serverSock, (sockaddr *)&address, sizeof(address)) < 0)
+        if (bind(serverSock, (sockaddr *)&addr, sizeof(addr)) < 0)
             Exception::throwFromErrno("Failed to bind to port");
     }
 
@@ -82,23 +82,23 @@ void serverMain(Context ctx) {
                                                            // that it can configure the routing
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe server running";
 
-    // Only returns on shutdown or fatal errors
+    // Start accepting connections from clients
     while (true) {
         if (listen(serverSock, 1) < 0)
             Exception::throwFromErrno("Failed to listen on port");
 
-        sockaddr_in address;
+        sockaddr_in addr;
         int addrlen;
-        int clientSocket = accept(serverSock, (struct sockaddr *)&address, (socklen_t *)&addrlen);
+        int clientSocket = accept(serverSock, (struct sockaddr *)&addr, (socklen_t *)&addrlen);
         if (clientSocket < 0) {
             BOOST_LOG_TRIVIAL(info) << "Failed to accept connection";
             continue;
         }
 
-        auto addr = boost::asio::ip::address_v4(ntohl(address.sin_addr.s_addr));
-        BOOST_LOG_TRIVIAL(info) << "Accepted connection from " << addr;
+        auto addr_v4 = boost::asio::ip::address_v4(ntohl(addr.sin_addr.s_addr));
+        BOOST_LOG_TRIVIAL(info) << "Accepted connection from " << addr_v4;
 
-        socketPC.addSocket(SocketProducerConsumer::SocketConfig{addr.to_string(), clientSocket});
+        socketPC.addSocket(SocketProducerConsumer::SocketConfig{addr_v4.to_string(), clientSocket});
     }
 }
 

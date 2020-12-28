@@ -19,6 +19,7 @@
 #pragma once
 
 #include <array>
+#include <boost/uuid/uuid.hpp>
 
 namespace ruralpi {
 
@@ -28,17 +29,27 @@ static constexpr size_t kTunnelFrameMaxSize = 4096;
 #pragma pack(push, 1)
 // Every tunnel frame starts with this header
 struct TunnelFrameHeader {
+    static constexpr uint64_t kInitialSeqNum = 0;
+
     struct Desc {
-        uint8_t version : 2;
-        uint8_t flags : 6;
+        uint16_t version : 2;
+        uint16_t flags : 2;
+        uint16_t size : 12;
     } desc;
-    uint8_t signature[128];
+    char signature[128];
+    boost::uuids::uuid sessionId;
     uint64_t seqNum;
 };
 
-// The datagrams in each tunnel frame are separated with this
+// The datagrams in each tunnel frame are separated with this structure
 struct TunnelFrameDatagramSeparator {
     uint16_t size;
+};
+
+// The first tunnel frame exchanged between client and server (seqNum 0) contains a single
+// "datagram" with this structure
+struct InitTunnelFrame {
+    char identifier[16];
 };
 #pragma pack(pop)
 
@@ -51,11 +62,17 @@ public:
      * whether the current pointer of the reader is located or whether there are any datagrams.
      */
     const TunnelFrameHeader &header() const { return *((TunnelFrameHeader *)_begin); }
+    uint8_t const *begin() const { return _begin; }
+    size_t totalSize() const { return header().desc.size; }
 
+    /**
+     * Must be called at least once to position the pointer at the first datagram in the frame. The
+     * data() and size() below may only be accessed if it returns true.
+     */
     bool next();
 
-    uint8_t const *data() { return _current + sizeof(TunnelFrameDatagramSeparator); }
-    uint8_t size() { return ((TunnelFrameDatagramSeparator *)_current)->size; }
+    uint8_t const *data() const { return _current + sizeof(TunnelFrameDatagramSeparator); }
+    size_t size() const { return ((TunnelFrameDatagramSeparator *)_current)->size; }
 
 private:
     uint8_t const *_begin;
@@ -88,7 +105,16 @@ public:
      * Must be invoked when no more datagrams will be written to that tunnel frame. It will update
      * the header of the frame and return the actual number of bytes which it contains.
      */
-    size_t close(uint64_t seqNum);
+    void close(uint64_t seqNum);
+    uint8_t const *begin() const { return _begin; }
+    size_t totalSize() const { return _current - _begin - 1; }
+
+    /**
+     * These methods are here just to facilitate the writing of unit-tests and should not be used in
+     * production code.
+     */
+    void appendBytes(uint8_t const *ptr, size_t size);
+    void appendString(const char str[]);
 
 private:
     uint8_t *_begin;
@@ -110,7 +136,7 @@ public:
      * The method is allowed to block if the upstream called is unable to process the frame
      * immediately.
      */
-    virtual void onTunnelFrameReady(void const *data, size_t size) = 0;
+    virtual void onTunnelFrameReady(TunnelFrameReader reader) = 0;
 
     void pipeTo(TunnelFramePipe &pipe);
     void unPipe();

@@ -25,8 +25,42 @@
 #include <sys/types.h>
 
 #include "common/exception.h"
+#include "common/tunnel_frame_stream.h"
 
 namespace ruralpi {
+namespace {
+
+std::string initialTunnelFrameExchange(TunnelFrameStream &stream, bool isClient) {
+    uint8_t buffer[512];
+
+    if (isClient) {
+        TunnelFrameWriter writer(buffer, sizeof(buffer));
+        strcpy(((char *)((InitTunnelFrame *)writer.data())->identifier), "RuralPipeClient");
+        writer.onDatagramWritten(16);
+        writer.close(TunnelFrameHeader::kInitialSeqNum);
+        stream.send(writer);
+
+        auto reader = stream.receive();
+        if (!reader.next())
+            throw Exception("Client received invalid initial frame response");
+
+        return std::string(((InitTunnelFrame const *)reader.data())->identifier);
+    } else {
+        auto reader = stream.receive();
+        if (!reader.next())
+            throw Exception("Server received invalid initial frame");
+
+        TunnelFrameWriter writer(buffer, sizeof(buffer));
+        strcpy(((char *)((InitTunnelFrame *)writer.data())->identifier), "RuralPipeServer");
+        writer.onDatagramWritten(16);
+        writer.close(TunnelFrameHeader::kInitialSeqNum);
+        stream.send(writer);
+
+        return std::string(((InitTunnelFrame const *)reader.data())->identifier);
+    }
+}
+
+} // namespace
 
 SocketProducerConsumer::SocketProducerConsumer(bool isClient) : _isClient(isClient) {}
 
@@ -57,17 +91,24 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
     });
 }
 
-void SocketProducerConsumer::stop() {}
+void SocketProducerConsumer::stop() {
+    // Interrupt the producer/consumer threads and join them
+    _receiveFromSocketTasksInterrupted.store(true);
 
-void SocketProducerConsumer::onTunnelFrameReady(void const *data, size_t size) {}
+    for (auto &t : _receiveFromSocketThreads) {
+        t.join();
+    }
+}
+
+void SocketProducerConsumer::onTunnelFrameReady(TunnelFrameReader reader) {}
 
 void SocketProducerConsumer::_receiveFromSocketLoop(int socketFd) {
-    // TODO: Run the connection establishment sequence
-    if (_isClient) {
-    } else {
-    }
+    TunnelFrameStream stream(socketFd);
+    initialTunnelFrameExchange(stream, _isClient);
 
-    // TODO: Run the actual TunnelFrame exchange loop
+    while (!_receiveFromSocketTasksInterrupted.load()) {
+        _pipe->onTunnelFrameReady(stream.receive());
+    }
 }
 
 } // namespace ruralpi
