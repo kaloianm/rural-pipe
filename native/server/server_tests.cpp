@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 
 #include "common/exception.h"
+#include "common/scoped_file_descriptor.h"
 #include "common/socket_producer_consumer.h"
 #include "common/tunnel_frame.h"
 #include "common/tunnel_frame_stream.h"
@@ -36,6 +37,21 @@ namespace fs = boost::filesystem;
 
 #define LOG BOOST_LOG_TRIVIAL(info)
 #define DATA_AND_SIZE(x) x, sizeof(x) + 1
+
+struct TestFifo {
+    ScopedFileDescriptor fd;
+
+    TestFifo()
+        : fd("Test FIFO", [] {
+              auto fifoPath = fs::temp_directory_path() / "rural_pipe_test";
+              remove(fifoPath.c_str());
+
+              if (mkfifo(fifoPath.c_str(), 0666) < 0)
+                  Exception::throwFromErrno("Unable to create the Fifo device");
+
+              return open(fifoPath.c_str(), O_RDWR);
+          }()) {}
+};
 
 void tunnelFrameTests() {
     uint8_t buffer[kTunnelFrameMaxSize];
@@ -59,29 +75,57 @@ void tunnelFrameTests() {
     assert(!reader.next());
 }
 
-struct Fifo {
-    Fifo() {
-        auto fifoPath = fs::temp_directory_path() / "rural_pipe";
-        remove(fifoPath.c_str());
+void tunnelFrameStreamTests() {
+    int fd;
+    TunnelFrameStream stream([&] {
+        TestFifo pipe;
+        fd = pipe.fd;
+        return std::move(pipe.fd);
+    }());
 
-        if (mkfifo(fifoPath.c_str(), 0666) < 0)
-            Exception::throwFromErrno("Unable to create the Fifo device");
+    uint8_t buffer[kTunnelFrameMaxSize];
 
-        fd = open(fifoPath.c_str(), O_RDWR);
-        if (fd < 0)
-            Exception::throwFromErrno("Unable to open the Fifo device");
+    // Send/receive
+    {
+        stream.send([&] {
+            TunnelFrameWriter writer(buffer, sizeof(buffer));
+            writer.appendString("DG1");
+            writer.close(0);
+            return writer;
+        }());
+
+        auto reader = stream.receive();
+        assert(reader.header().seqNum == 0);
+        assert(reader.next());
+        LOG << (char *)reader.data();
+        assert(!reader.next());
     }
 
-    ~Fifo() {
-        if (fd > 0)
-            close(fd);
+    // Send/receive of a partial frame
+    {
+        TunnelFrameWriter writer(buffer, sizeof(buffer));
+        for (int i = 0; i < 10; i++) {
+            writer.appendString("Longer datagram content; Longer datagram content; Longer datagram "
+                                "content; Longer datagram content; Longer datagram content; Longer "
+                                "datagram content");
+        }
+        writer.close(0);
+        LOG << "Size " << writer.totalSize();
+        assert(write(fd, writer.begin(), 100) == 100);
+        assert(write(fd, writer.begin() + 100, writer.totalSize() - 100) ==
+               writer.totalSize() - 100);
+        auto reader = stream.receive();
+        assert(reader.header().seqNum == 0);
+        for (int i = 0; i < 10; i++) {
+            assert(reader.next());
+            LOG << (char *)reader.data();
+        }
+        assert(!reader.next());
     }
-
-    int fd{-1};
-};
+}
 
 void tunnelProducerConsumerTests() {
-    Fifo pipes[2];
+    TestFifo pipes[2];
     TunnelProducerConsumer tunnelPC(std::vector<int>{pipes[0].fd, pipes[1].fd});
 
     struct TestPipe : public TunnelFramePipe {
@@ -126,52 +170,8 @@ void tunnelProducerConsumerTests() {
     tunnelPC.unPipe();
 }
 
-void tunnelFrameStreamTests() {
-    uint8_t buffer[kTunnelFrameMaxSize];
-    Fifo pipe;
-    TunnelFrameStream stream(pipe.fd);
-
-    // Send/receive
-    {
-        stream.send([&] {
-            TunnelFrameWriter writer(buffer, sizeof(buffer));
-            writer.appendString("DG1");
-            writer.close(0);
-            return writer;
-        }());
-
-        auto reader = stream.receive();
-        assert(reader.header().seqNum == 0);
-        assert(reader.next());
-        LOG << (char *)reader.data();
-        assert(!reader.next());
-    }
-
-    // Send/receive of a partial frame
-    {
-        TunnelFrameWriter writer(buffer, sizeof(buffer));
-        for (int i = 0; i < 10; i++) {
-            writer.appendString("Longer datagram content; Longer datagram content; Longer datagram "
-                                "content; Longer datagram content; Longer datagram content; Longer "
-                                "datagram content");
-        }
-        writer.close(0);
-        LOG << "Size " << writer.totalSize();
-        assert(write(pipe.fd, writer.begin(), 100) == 100);
-        assert(write(pipe.fd, writer.begin() + 100, writer.totalSize() - 100) ==
-               writer.totalSize() - 100);
-        auto reader = stream.receive();
-        assert(reader.header().seqNum == 0);
-        for (int i = 0; i < 10; i++) {
-            assert(reader.next());
-            LOG << (char *)reader.data();
-        }
-        assert(!reader.next());
-    }
-}
-
 void socketProducerConsumerTests() {
-    Fifo pipes[2];
+    TestFifo pipes[2];
     SocketProducerConsumer socketPC(true /* isClient */);
 
     struct TestPipe : public TunnelFramePipe {

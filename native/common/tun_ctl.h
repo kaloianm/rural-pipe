@@ -21,6 +21,8 @@
 #include <string>
 #include <vector>
 
+#include "common/scoped_file_descriptor.h"
+
 namespace ruralpi {
 
 /**
@@ -40,14 +42,7 @@ public:
 
 private:
     std::string _deviceName;
-
-    struct ScopedFileDescriptors {
-        ScopedFileDescriptors(int numDescriptorsToAlloc);
-        ~ScopedFileDescriptors();
-
-        std::vector<int> fds;
-    };
-    ScopedFileDescriptors _fileDescriptors;
+    std::vector<ScopedFileDescriptor> _fds;
 };
 
 } // namespace ruralpi

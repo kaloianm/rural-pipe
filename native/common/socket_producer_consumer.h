@@ -24,6 +24,7 @@
 #include <thread>
 #include <vector>
 
+#include "common/scoped_file_descriptor.h"
 #include "common/tunnel_frame.h"
 
 namespace ruralpi {
@@ -36,7 +37,9 @@ public:
         std::string name;
 
         // File descriptor of the socket
-        int fd;
+        ScopedFileDescriptor fd;
+
+        SocketConfig(std::string name, int fd);
     };
 
     SocketProducerConsumer(bool isClient);
@@ -54,19 +57,16 @@ private:
     void onTunnelFrameReady(TunnelFrameReader reader) override;
 
     /**
-     * Runs on a thread per socket file descriptor (from `_configs`). Receives incoming tunnel
-     * frames and passes them on to the upstream tunnel producer/consumer.
+     * Runs on a thread per socket file descriptor passed through call to `addSocket`. Receives
+     * incoming tunnel frames and passes them on to the upstream tunnel producer/consumer.
      */
-    void _receiveFromSocketLoop(int socketFd);
+    void _receiveFromSocketLoop(SocketConfig config);
 
     // Indicates whether this socket is run as a client or server
     bool _isClient;
 
     // Mutex to protect access to the state below
     std::mutex _mutex;
-
-    // Sockets for the outbound network connections
-    std::vector<SocketConfig> _configs;
 
     // Associated with the `_receiveFromSocketLoop`
     std::atomic<bool> _receiveFromSocketTasksInterrupted{false};

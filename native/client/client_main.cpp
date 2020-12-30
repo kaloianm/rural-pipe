@@ -17,7 +17,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #include <arpa/inet.h>
-#include <boost/asio/ip/address.hpp>
+#include <boost/asio.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
@@ -57,36 +57,44 @@ void clientMain(Context ctx) {
                             << " queues";
 
     // Create the client-side Tunnel device
-    TunCtl tunnel("rpi", ctx.options.nqueues);
+    TunCtl tunnel("rpic", ctx.options.nqueues);
     TunnelProducerConsumer tunnelPC(tunnel.getQueues());
     SocketProducerConsumer socketPC(true /* isClient */);
     tunnelPC.pipeTo(socketPC);
     tunnelPC.start();
 
     // Connect to the server
-    while (true) {
-        int sock = socket(AF_INET, SOCK_STREAM, 0);
-        if (sock < 0)
-            Exception::throwFromErrno("Failed to create socket");
-
+    {
         struct sockaddr_in addr;
-        addr.sin_family = AF_INET;
-        addr.sin_addr.s_addr = 0;
-        addr.sin_port = htons(ctx.options.serverPort);
+        {
+            boost::asio::io_service io_service;
+            boost::asio::ip::tcp::resolver resolver(io_service);
+            boost::asio::ip::tcp::resolver::query query(ctx.options.serverHost,
+                                                        std::to_string(ctx.options.serverPort));
+            boost::asio::ip::tcp::resolver::iterator iter = resolver.resolve(query);
+            memcpy(&addr, iter->endpoint().data(), iter->endpoint().size());
+        }
 
         auto addr_v4 = boost::asio::ip::address_v4(ntohl(addr.sin_addr.s_addr));
-        BOOST_LOG_TRIVIAL(info) << "Accepted connection from " << addr_v4;
+        BOOST_LOG_TRIVIAL(info) << "Connecting to " << addr_v4;
 
-        if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+        SocketProducerConsumer::SocketConfig config(addr_v4.to_string(),
+                                                    socket(AF_INET, SOCK_STREAM, 0));
+
+        if (connect(config.fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
             Exception::throwFromErrno("Failed to connect to server");
 
-        socketPC.addSocket(SocketProducerConsumer::SocketConfig{addr_v4.to_string(), sock});
+        socketPC.addSocket(std::move(config));
     }
 
     std::cout << "Rural Pipe client running" << std::endl; // Indicates to the startup script that
                                                            // the tunnel device has been created and
                                                            // that it can configure the routing
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe client running";
+
+    while (true) {
+        sleep(30);
+    }
 }
 
 } // namespace

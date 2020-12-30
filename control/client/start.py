@@ -49,9 +49,9 @@ async def start_client_and_wait(options):
 
     print('Client started and active, configuring routing ...')
 
-    ipcmd = await asyncio.create_subprocess_shell('ip link set rpi up')
+    ipcmd = await asyncio.create_subprocess_shell('ip link set rpic up')
     await ipcmd.wait()
-    ipcmd = await asyncio.create_subprocess_shell('ip addr add ' + options.bind_ip + ' dev rpi')
+    ipcmd = await asyncio.create_subprocess_shell('ip addr add ' + options.bind_ip + ' dev rpic')
     await ipcmd.wait()
 
     print('Routing configured')

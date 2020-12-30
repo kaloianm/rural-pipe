@@ -18,22 +18,36 @@
 
 #pragma once
 
+#include "common/scoped_file_descriptor.h"
 #include "common/tunnel_frame.h"
 
 namespace ruralpi {
 
+/**
+ * Blocking interface, which takes ownership of a socket file descriptor and sends and receives
+ * tunnel frames from it.
+ */
 class TunnelFrameStream {
 public:
     // An established file descriptor, whose lifetime is owned by the tunnel frame stream after
     // construction
-    TunnelFrameStream(int fd);
+    TunnelFrameStream(ScopedFileDescriptor fd);
     ~TunnelFrameStream();
 
+    /**
+     * Expects a closed tunnel frame writer, takes its contents and sends them on the socket. Will
+     * block if the buffer of the socket is full.
+     */
     void send(const TunnelFrameWriter &writer);
+
+    /**
+     * Receives a tunnel frame from the socket. Will block if there is no data available from the
+     * socket yet.
+     */
     TunnelFrameReader receive();
 
 private:
-    int _fd;
+    ScopedFileDescriptor _fd;
 
     uint8_t _buffer[kTunnelFrameMaxSize];
 };

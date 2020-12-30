@@ -16,48 +16,24 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
-#include "common/tun_ctl.h"
+#pragma once
 
-#include <fcntl.h>
-#include <linux/if.h>
-#include <linux/if_tun.h>
-#include <string.h>
-#include <sys/ioctl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-
-#include "common/exception.h"
+#include <string>
 
 namespace ruralpi {
-namespace {
 
-const char kDeviceName[] = "RPI";
+class ScopedFileDescriptor {
+public:
+    ScopedFileDescriptor(std::string desc, int fd);
+    ~ScopedFileDescriptor();
+    ScopedFileDescriptor(ScopedFileDescriptor &&);
 
-} // namespace
+    operator int() const { return _fd; }
 
-TunCtl::TunCtl(std::string deviceName, int numQueues) : _deviceName(std::move(deviceName)) {
-    ifreq ifr;
-    memset(&ifr, 0, sizeof(ifr));
-
-    // Flags:   IFF_TUN   - TUN device (no Ethernet headers)
-    //          IFF_NO_PI - Do not provide packet information
-    //          IFF_MULTI_QUEUE - Create a queue of multiqueue device
-    ifr.ifr_flags = IFF_TUN | IFF_NO_PI | IFF_MULTI_QUEUE;
-    strcpy(ifr.ifr_name, _deviceName.c_str());
-
-    for (int i = 0; i < numQueues; i++) {
-        _fds.emplace_back("Tunnel device", open("/dev/net/tun", O_RDWR));
-        if (ioctl(_fds[i], TUNSETIFF, (void *)&ifr))
-            Exception::throwFromErrno("Configuring tunnel device");
-    }
-}
-
-std::vector<int> TunCtl::getQueues() const {
-    std::vector<int> fds;
-    for (auto &fd : _fds)
-        fds.emplace_back(fd);
-    return fds;
-}
+private:
+    // Description used for debugging and diagnostics purposes
+    std::string _desc;
+    int _fd;
+};
 
 } // namespace ruralpi

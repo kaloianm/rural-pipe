@@ -56,17 +56,14 @@ void serverMain(Context ctx) {
                             << ctx.options.nqueues << " queues";
 
     // Create the server-side Tunnel device
-    TunCtl tunnel("rpi", ctx.options.nqueues);
+    TunCtl tunnel("rpis", ctx.options.nqueues);
     TunnelProducerConsumer tunnelPC(tunnel.getQueues());
     SocketProducerConsumer socketPC(false /* isClient */);
     tunnelPC.pipeTo(socketPC);
     tunnelPC.start();
 
-    // Bund to the server's listening port
-    int serverSock = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverSock == 0)
-        Exception::throwFromErrno("Failed to create socket");
-
+    // Bind to the server's listening port
+    ScopedFileDescriptor serverSock("Server main socket", socket(AF_INET, SOCK_STREAM, 0));
     {
         sockaddr_in addr;
         addr.sin_family = AF_INET;

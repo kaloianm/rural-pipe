@@ -77,13 +77,15 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
     if (!isSocket)
         BOOST_LOG_TRIVIAL(warning) << "File descriptor is not a socket";
 
-    _receiveFromSocketThreads.emplace_back([this, config] {
+    BOOST_LOG_TRIVIAL(info) << "Starting thread for socket file descriptor " << config.fd;
+
+    _receiveFromSocketThreads.emplace_back([this, config = std::move(config)]() mutable {
         try {
-            _receiveFromSocketLoop(config.fd);
+            _receiveFromSocketLoop(std::move(config));
 
             BOOST_LOG_TRIVIAL(info) << "Thread for socket " << config.fd
                                     << " exited normally. This should never be reached.";
-            assert(false);
+            BOOST_ASSERT(false);
         } catch (const std::exception &ex) {
             BOOST_LOG_TRIVIAL(info)
                 << "Thread for socket " << config.fd << " completed due to " << ex.what();
@@ -102,13 +104,17 @@ void SocketProducerConsumer::stop() {
 
 void SocketProducerConsumer::onTunnelFrameReady(TunnelFrameReader reader) {}
 
-void SocketProducerConsumer::_receiveFromSocketLoop(int socketFd) {
-    TunnelFrameStream stream(socketFd);
-    initialTunnelFrameExchange(stream, _isClient);
+void SocketProducerConsumer::_receiveFromSocketLoop(SocketConfig config) {
+    TunnelFrameStream stream(std::move(config.fd));
+    BOOST_LOG_TRIVIAL(info) << "Initial exchange with "
+                            << initialTunnelFrameExchange(stream, _isClient) << " successful";
 
     while (!_receiveFromSocketTasksInterrupted.load()) {
         _pipe->onTunnelFrameReady(stream.receive());
     }
 }
+
+SocketProducerConsumer::SocketConfig::SocketConfig(std::string name_, int fd_)
+    : name(std::move(name_)), fd(name, fd_) {}
 
 } // namespace ruralpi

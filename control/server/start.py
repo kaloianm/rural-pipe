@@ -43,7 +43,14 @@ async def start_server_and_wait(options):
         print('Failed to start service')
         return await server_process.wait()
 
-    print('Server started and active')
+    print('Server started and active, configuring routing ...')
+
+    ipcmd = await asyncio.create_subprocess_shell('ip link set rpis up')
+    await ipcmd.wait()
+    ipcmd = await asyncio.create_subprocess_shell('ip addr add ' + options.bind_ip + ' dev rpis')
+    await ipcmd.wait()
+
+    print('Routing configured')
 
     while True:
         line = await server_process.stdout.readline()
@@ -61,6 +68,8 @@ def main():
     config_files_read = config.read('server.cfg')
 
     parser = OptionParser()
+    parser.add_option('--bindip', dest='bind_ip', help='IP address to which to bind the network',
+                      default=config.get('settings', 'bindip'))
 
     (options, args) = parser.parse_args()
     sys.exit(asyncio.run(start_server_and_wait(options)))

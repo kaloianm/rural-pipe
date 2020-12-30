@@ -22,6 +22,7 @@ common = env.Library(
     source=[
         'exception.cpp',
         'ip_parsers.cpp',
+        'scoped_file_descriptor.cpp',
         'socket_producer_consumer.cpp',
         'tun_ctl.cpp',
         'tunnel_frame_stream.cpp',

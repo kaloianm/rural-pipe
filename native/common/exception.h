@@ -33,7 +33,13 @@ public:
     const char *what() const noexcept override;
 
     static void throwFromErrno(const std::string &context);
+    static void throwFromErrno(const boost::format &context);
     static void throwFromErrno();
+
+    /**
+     * Returns a formatted last system error information from `errno`.
+     */
+    static std::string getLastError();
 
 private:
     std::string _message;

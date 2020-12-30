@@ -73,13 +73,16 @@ void TunnelProducerConsumer::start() {
         if (!isSocket)
             BOOST_LOG_TRIVIAL(warning) << "File descriptor is not a socket";
 
-        _receiveFromTunnelThreads.emplace_back([this, fd = _tunnelFds[i]] {
+        int fd = _tunnelFds[i];
+        BOOST_LOG_TRIVIAL(info) << "Starting thread for tunnel file descriptor " << fd;
+
+        _receiveFromTunnelThreads.emplace_back([this, fd] {
             try {
                 _receiveFromTunnelLoop(fd);
 
-                BOOST_LOG_TRIVIAL(info) << "Thread for socket " << fd
-                                        << " exited normally. This should never be reached.";
-                assert(false);
+                BOOST_LOG_TRIVIAL(fatal) << "Thread for socket " << fd
+                                         << " exited normally. This should never be reached.";
+                BOOST_ASSERT(false);
             } catch (const std::exception &ex) {
                 BOOST_LOG_TRIVIAL(info)
                     << "Thread for socket " << fd << " completed due to " << ex.what();

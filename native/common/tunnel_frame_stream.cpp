@@ -24,9 +24,9 @@
 
 namespace ruralpi {
 
-TunnelFrameStream::TunnelFrameStream(int fd) : _fd(fd) {}
+TunnelFrameStream::TunnelFrameStream(ScopedFileDescriptor fd) : _fd(std::move(fd)) {}
 
-TunnelFrameStream::~TunnelFrameStream() { close(_fd); }
+TunnelFrameStream::~TunnelFrameStream() = default;
 
 void TunnelFrameStream::send(const TunnelFrameWriter &writer) {
     int numWritten = 0;
@@ -45,6 +45,8 @@ TunnelFrameReader TunnelFrameStream::receive() {
     int res = read(_fd, (void *)&_buffer[0], sizeof(TunnelFrameHeader));
     if (res < 0)
         Exception::throwFromErrno("Failed to receive tunnel frame's header");
+    if (res == 0)
+        throw new Exception("Socket closed");
     numRead += res;
 
     int totalSize = ((TunnelFrameHeader *)_buffer)->desc.size;
@@ -54,11 +56,13 @@ TunnelFrameReader TunnelFrameStream::receive() {
         res = read(_fd, (void *)&_buffer[numRead], totalSize - numRead);
         if (res < 0)
             Exception::throwFromErrno("Failed to receive tunnel frame's body");
+        if (res == 0)
+            throw new Exception("Socket closed");
         numRead += res;
         BOOST_LOG_TRIVIAL(debug) << "Received " << numRead << " bytes so far";
     }
 
-    assert(numRead == totalSize);
+    BOOST_ASSERT(numRead == totalSize);
     return TunnelFrameReader(_buffer, totalSize);
 }
 

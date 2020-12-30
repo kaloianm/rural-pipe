@@ -18,7 +18,6 @@
 
 #include "common/exception.h"
 
-#include <boost/format.hpp>
 #include <errno.h>
 #include <string.h>
 
@@ -31,20 +30,23 @@ Exception::Exception(boost::format formatter) : Exception(formatter.str()) {}
 const char *Exception::what() const noexcept { return _message.c_str(); }
 
 void Exception::throwFromErrno(const std::string &context) {
+    if (context.empty())
+        throw Exception(boost::format("System error %s") % getLastError());
+    else
+        throw Exception(boost::format("(%s): System error %s") % context % getLastError());
+}
+
+void Exception::throwFromErrno(const boost::format &context) { throwFromErrno(context.str()); }
+
+void Exception::throwFromErrno() { throwFromErrno(""); }
+
+std::string Exception::getLastError() {
     BOOST_ASSERT(errno);
     const int savedErrno = errno;
 
-    constexpr size_t kErrTextSize = 4096;
-    std::string errString(kErrTextSize, 0);
-    if (context.empty())
-        throw Exception(boost::str(boost::format("System error (%d): %s") % savedErrno %
-                                   strerror_r(savedErrno, (char *)errString.data(), kErrTextSize)));
-    else
-        throw Exception(
-            boost::str(boost::format("(%s): System error (%d): %s") % context % savedErrno %
-                       strerror_r(savedErrno, (char *)errString.data(), kErrTextSize)));
+    char buf[1024];
+    return boost::str(boost::format("(%d): %s") % savedErrno %
+                      strerror_r(savedErrno, buf, sizeof(buf)));
 }
-
-void Exception::throwFromErrno() { throwFromErrno(""); }
 
 } // namespace ruralpi
