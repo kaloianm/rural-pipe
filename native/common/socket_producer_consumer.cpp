@@ -21,8 +21,6 @@
 #include <boost/log/trivial.hpp>
 #include <chrono>
 #include <poll.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 
 #include "common/exception.h"
 #include "common/tunnel_frame_stream.h"
@@ -62,9 +60,18 @@ std::string initialTunnelFrameExchange(TunnelFrameStream &stream, bool isClient)
 
 } // namespace
 
-SocketProducerConsumer::SocketProducerConsumer(bool isClient) : _isClient(isClient) {}
+SocketProducerConsumer::SocketProducerConsumer(bool isClient, TunnelFramePipe &pipe)
+    : _isClient(isClient) {
+    pipeTo(pipe);
+}
 
-SocketProducerConsumer::~SocketProducerConsumer() = default;
+SocketProducerConsumer::~SocketProducerConsumer() {
+    for (auto &t : _receiveFromSocketThreads) {
+        t.join();
+    }
+
+    unPipe();
+}
 
 void SocketProducerConsumer::addSocket(SocketConfig config) {
     const bool isSocket = [&] {
@@ -93,13 +100,9 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
     });
 }
 
-void SocketProducerConsumer::stop() {
+void SocketProducerConsumer::interrupt() {
     // Interrupt the producer/consumer threads and join them
     _receiveFromSocketTasksInterrupted.store(true);
-
-    for (auto &t : _receiveFromSocketThreads) {
-        t.join();
-    }
 }
 
 void SocketProducerConsumer::onTunnelFrameReady(TunnelFrameReader reader) {}

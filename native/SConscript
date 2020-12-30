@@ -67,7 +67,7 @@ def MakeCommonNativeEnv(arch_name):
         os.path.join(boost_install_directory, 'boost', 'lib'),
         native_env.Dir(arch['arch'])
     ])
-    env.Append(LIBS=[boost_library_names, 'pthread'])
+    env.Append(LIBS=['common', boost_library_names, 'pthread'])
     for (tool, name) in [
         ('CXX', 'g++'),
     ]:
@@ -80,10 +80,8 @@ def MakeCommonNativeEnv(arch_name):
 
 # Build the Client
 env = MakeCommonNativeEnv('CLIENT_ARCH')
-env.Append(LIBS=['common'])
 SConscript('client/SConscript', exports='env', duplicate=0)
 
 # Build the Server
 env = MakeCommonNativeEnv('SERVER_ARCH')
-env.Append(LIBS=['common'])
 SConscript('server/SConscript', exports='env', duplicate=0)

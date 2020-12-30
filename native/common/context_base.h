@@ -18,29 +18,29 @@
 
 #pragma once
 
-#include <boost/program_options.hpp>
+#include <boost/optional.hpp>
+#include <condition_variable>
+#include <functional>
+#include <mutex>
+#include <string>
 
-#include "common/context_base.h"
+#include "common/command_server.h"
 
 namespace ruralpi {
-namespace client {
 
-struct Context : public ContextBase {
-    Context(int argc, const char *argv[]);
+class ContextBase {
+public:
+    ContextBase(std::string serviceName, CommandsServer::OnCommandFn onCommand);
+    ~ContextBase();
 
-    bool help() const;
-    const auto &desc() const { return _desc; }
-
-    int nqueues;
-    std::string serverHost;
-    int serverPort;
+    int waitForCompletion();
 
 private:
-    std::string _onCommand(int argc, const char *argv[]);
+    std::mutex _mutex;
+    std::condition_variable _condVar;
+    boost::optional<int> _retVal;
 
-    boost::program_options::options_description _desc;
-    boost::program_options::variables_map _vm;
+    boost::optional<CommandsServer> _cmdServer;
 };
 
-} // namespace client
 } // namespace ruralpi

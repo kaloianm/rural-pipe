@@ -16,31 +16,26 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
-#pragma once
+#include "common/command_server.h"
 
-#include <boost/program_options.hpp>
-
-#include "common/context_base.h"
+#include <boost/filesystem.hpp>
+#include <boost/log/trivial.hpp>
 
 namespace ruralpi {
-namespace client {
+namespace {
 
-struct Context : public ContextBase {
-    Context(int argc, const char *argv[]);
+namespace fs = boost::filesystem;
 
-    bool help() const;
-    const auto &desc() const { return _desc; }
+ScopedFileDescriptor openPipe(const std::string &pipeName) {
+    auto fifoPath = fs::temp_directory_path() / pipeName;
+    return ScopedFileDescriptor(fifoPath.string(), open(fifoPath.c_str(), O_RDWR));
+}
 
-    int nqueues;
-    std::string serverHost;
-    int serverPort;
+} // namespace
 
-private:
-    std::string _onCommand(int argc, const char *argv[]);
+CommandsServer::CommandsServer(std::string pipeName, OnCommandFn onCommand)
+    : _pipeName(std::move(pipeName)), _onCommand(std::move(onCommand)), _fd(openPipe(_pipeName)) {}
 
-    boost::program_options::options_description _desc;
-    boost::program_options::variables_map _vm;
-};
+CommandsServer::~CommandsServer() {}
 
-} // namespace client
 } // namespace ruralpi

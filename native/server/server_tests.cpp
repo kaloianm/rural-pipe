@@ -18,9 +18,7 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/log/trivial.hpp>
-#include <fcntl.h>
 #include <mutex>
-#include <sys/stat.h>
 
 #include "common/exception.h"
 #include "common/scoped_file_descriptor.h"
@@ -129,6 +127,9 @@ void tunnelProducerConsumerTests() {
     TunnelProducerConsumer tunnelPC(std::vector<int>{pipes[0].fd, pipes[1].fd});
 
     struct TestPipe : public TunnelFramePipe {
+        TestPipe(TunnelFramePipe &pipe) { pipeTo(pipe); }
+        ~TestPipe() { unPipe(); }
+
         void onTunnelFrameReady(TunnelFrameReader reader) override {
             LOG << "Received a frame of " << reader.totalSize() << " bytes";
 
@@ -144,10 +145,7 @@ void tunnelProducerConsumerTests() {
         int numFramesReceived{0};
         uint8_t lastFrameReceived[kTunnelFrameMaxSize];
         size_t lastFrameReceivedSize{0};
-    } testPipe;
-
-    tunnelPC.pipeTo(testPipe);
-    tunnelPC.start();
+    } testPipe(tunnelPC);
 
     LOG << "Sending datagrams on file descriptors " << pipes[0].fd << " " << pipes[1].fd;
     assert(write(pipes[0].fd, DATA_AND_SIZE("DG1.1")) > 0);
@@ -166,17 +164,19 @@ void tunnelProducerConsumerTests() {
     testPipe.sendFrameBack(
         TunnelFrameReader(testPipe.lastFrameReceived, testPipe.lastFrameReceivedSize));
 
-    tunnelPC.stop();
-    tunnelPC.unPipe();
+    tunnelPC.interrupt();
 }
 
 void socketProducerConsumerTests() {
     TestFifo pipes[2];
-    SocketProducerConsumer socketPC(true /* isClient */);
 
     struct TestPipe : public TunnelFramePipe {
         void onTunnelFrameReady(TunnelFrameReader reader) override {}
     } testPipe;
+
+    SocketProducerConsumer socketPC(true /* isClient */, testPipe);
+
+    socketPC.interrupt();
 }
 
 void serverTestsMain() {

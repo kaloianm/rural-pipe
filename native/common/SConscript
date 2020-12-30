@@ -20,6 +20,8 @@ Import('env')
 common = env.Library(
     target='common',
     source=[
+        'command_server.cpp',
+        'context_base.cpp',
         'exception.cpp',
         'ip_parsers.cpp',
         'scoped_file_descriptor.cpp',

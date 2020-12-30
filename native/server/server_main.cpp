@@ -17,10 +17,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #include <boost/asio/ip/address.hpp>
-#include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/log/utility/setup/common_attributes.hpp>
-#include <boost/log/utility/setup/file.hpp>
+#include <iostream>
 #include <netinet/in.h>
 #include <sys/socket.h>
 
@@ -34,33 +32,14 @@ namespace ruralpi {
 namespace server {
 namespace {
 
-namespace logging = boost::log;
-
-void initLogging() {
-    logging::add_file_log(logging::keywords::file_name = "server_%N.log",
-                          logging::keywords::rotation_size = 10 * 1024 * 1024,
-                          logging::keywords::time_based_rotation =
-                              logging::sinks::file::rotation_at_time_point(0, 0, 0),
-                          logging::keywords::auto_flush = true,
-                          logging::keywords::format = "[%TimeStamp%]: %Message%");
-
-    logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
-
-    logging::add_common_attributes();
-}
-
-void serverMain(Context ctx) {
-    initLogging();
-
-    BOOST_LOG_TRIVIAL(info) << "Rural Pipe server starting on port " << ctx.options.port << " with "
-                            << ctx.options.nqueues << " queues";
+void serverMain(Context &ctx) {
+    BOOST_LOG_TRIVIAL(info) << "Rural Pipe server starting on port " << ctx.port << " with "
+                            << ctx.nqueues << " queues";
 
     // Create the server-side Tunnel device
-    TunCtl tunnel("rpis", ctx.options.nqueues);
+    TunCtl tunnel("rpis", ctx.nqueues);
     TunnelProducerConsumer tunnelPC(tunnel.getQueues());
-    SocketProducerConsumer socketPC(false /* isClient */);
-    tunnelPC.pipeTo(socketPC);
-    tunnelPC.start();
+    SocketProducerConsumer socketPC(false /* isClient */, tunnelPC);
 
     // Bind to the server's listening port
     ScopedFileDescriptor serverSock("Server main socket", socket(AF_INET, SOCK_STREAM, 0));
@@ -68,7 +47,7 @@ void serverMain(Context ctx) {
         sockaddr_in addr;
         addr.sin_family = AF_INET;
         addr.sin_addr.s_addr = INADDR_ANY;
-        addr.sin_port = htons(ctx.options.port);
+        addr.sin_port = htons(ctx.port);
 
         if (bind(serverSock, (sockaddr *)&addr, sizeof(addr)) < 0)
             Exception::throwFromErrno("Failed to bind to port");
@@ -105,15 +84,15 @@ void serverMain(Context ctx) {
 
 int main(int argc, const char *argv[]) {
     try {
-        ruralpi::server::Context ctx(ruralpi::server::Options(argc, argv));
+        ruralpi::server::Context ctx(argc, argv);
 
-        if (ctx.options.help()) {
-            std::cout << ctx.options.desc();
+        if (ctx.help()) {
+            std::cout << ctx.desc();
             return 1;
         }
 
-        ruralpi::server::serverMain(std::move(ctx));
-        return 0;
+        ruralpi::server::serverMain(ctx);
+        return ctx.waitForCompletion();
     } catch (const std::exception &ex) {
         BOOST_LOG_TRIVIAL(fatal) << "Error occurred: " << ex.what();
         return 1;

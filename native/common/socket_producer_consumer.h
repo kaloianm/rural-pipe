@@ -42,15 +42,12 @@ public:
         SocketConfig(std::string name, int fd);
     };
 
-    SocketProducerConsumer(bool isClient);
+    SocketProducerConsumer(bool isClient, TunnelFramePipe &pipe);
     ~SocketProducerConsumer();
 
-    // These methods match the order of instantiation and destruction of the socket
-    // producer/consumer in order to ensure there is no invalid memory accesses
-    using TunnelFramePipe::pipeTo;
     void addSocket(SocketConfig config);
-    void stop();
-    using TunnelFramePipe::unPipe;
+
+    void interrupt();
 
 private:
     // TunnelFramePipe methods

@@ -24,13 +24,17 @@
 
 namespace ruralpi {
 
-ScopedFileDescriptor::ScopedFileDescriptor(std::string desc, int fd)
-    : _desc(std::move(desc)), _fd(fd) {
+FileDescriptor::FileDescriptor(const std::string &desc, int fd) : _desc(desc), _fd(fd) {
     if (_fd < 0) {
         Exception::throwFromErrno(boost::format("Could not open file descriptor (%d): %s") % _fd %
                                   _desc);
     }
+}
 
+FileDescriptor::FileDescriptor() = default;
+
+ScopedFileDescriptor::ScopedFileDescriptor(const std::string &desc, int fd)
+    : FileDescriptor(desc, fd) {
     BOOST_LOG_TRIVIAL(debug) << boost::format("File descriptor created (%d): %s") % _fd % _desc;
 }
 

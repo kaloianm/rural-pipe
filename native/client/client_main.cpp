@@ -18,10 +18,8 @@
 
 #include <arpa/inet.h>
 #include <boost/asio.hpp>
-#include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/log/utility/setup/common_attributes.hpp>
-#include <boost/log/utility/setup/file.hpp>
+#include <iostream>
 #include <sys/socket.h>
 
 #include "client/context.h"
@@ -34,34 +32,14 @@ namespace ruralpi {
 namespace client {
 namespace {
 
-namespace logging = boost::log;
-
-void initLogging() {
-    logging::add_file_log(logging::keywords::file_name = "client_%N.log",
-                          logging::keywords::rotation_size = 10 * 1024 * 1024,
-                          logging::keywords::time_based_rotation =
-                              logging::sinks::file::rotation_at_time_point(0, 0, 0),
-                          logging::keywords::auto_flush = true,
-                          logging::keywords::format = "[%TimeStamp%]: %Message%");
-
-    logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
-
-    logging::add_common_attributes();
-}
-
-void clientMain(Context ctx) {
-    initLogging();
-
-    BOOST_LOG_TRIVIAL(info) << "Rural Pipe client starting with server " << ctx.options.serverHost
-                            << ':' << ctx.options.serverPort << " and " << ctx.options.nqueues
-                            << " queues";
+void clientMain(Context &ctx) {
+    BOOST_LOG_TRIVIAL(info) << "Rural Pipe client starting with server " << ctx.serverHost << ':'
+                            << ctx.serverPort << " and " << ctx.nqueues << " queues";
 
     // Create the client-side Tunnel device
-    TunCtl tunnel("rpic", ctx.options.nqueues);
+    TunCtl tunnel("rpic", ctx.nqueues);
     TunnelProducerConsumer tunnelPC(tunnel.getQueues());
-    SocketProducerConsumer socketPC(true /* isClient */);
-    tunnelPC.pipeTo(socketPC);
-    tunnelPC.start();
+    SocketProducerConsumer socketPC(true /* isClient */, tunnelPC);
 
     // Connect to the server
     {
@@ -69,8 +47,8 @@ void clientMain(Context ctx) {
         {
             boost::asio::io_service io_service;
             boost::asio::ip::tcp::resolver resolver(io_service);
-            boost::asio::ip::tcp::resolver::query query(ctx.options.serverHost,
-                                                        std::to_string(ctx.options.serverPort));
+            boost::asio::ip::tcp::resolver::query query(ctx.serverHost,
+                                                        std::to_string(ctx.serverPort));
             boost::asio::ip::tcp::resolver::iterator iter = resolver.resolve(query);
             memcpy(&addr, iter->endpoint().data(), iter->endpoint().size());
         }
@@ -91,10 +69,6 @@ void clientMain(Context ctx) {
                                                            // the tunnel device has been created and
                                                            // that it can configure the routing
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe client running";
-
-    while (true) {
-        sleep(30);
-    }
 }
 
 } // namespace
@@ -103,15 +77,15 @@ void clientMain(Context ctx) {
 
 int main(int argc, const char *argv[]) {
     try {
-        ruralpi::client::Context ctx(ruralpi::client::Options(argc, argv));
+        ruralpi::client::Context ctx(argc, argv);
 
-        if (ctx.options.help()) {
-            std::cout << ctx.options.desc();
+        if (ctx.help()) {
+            std::cout << ctx.desc();
             return 1;
         }
 
-        ruralpi::client::clientMain(std::move(ctx));
-        return 0;
+        ruralpi::client::clientMain(ctx);
+        return ctx.waitForCompletion();
     } catch (const std::exception &ex) {
         BOOST_LOG_TRIVIAL(fatal) << "Error occurred: " << ex.what();
         return 1;

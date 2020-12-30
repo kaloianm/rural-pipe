@@ -28,9 +28,10 @@ namespace server {
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
 
-Context::Context(Options options) : options(std::move(options)) {}
-
-Options::Options(int argc, const char *argv[]) : _desc("Server options") {
+Context::Context(int argc, const char *argv[])
+    : ContextBase("server",
+                  [this](int argc, const char *argv[]) { return _onCommand(argc, argv); }),
+      _desc("Server options") {
     // clang-format off
     _desc.add_options()
         ("help", "Produces this help message")
@@ -48,7 +49,9 @@ Options::Options(int argc, const char *argv[]) : _desc("Server options") {
     port = _vm["settings.port"].as<int>();
 }
 
-bool Options::help() const { return _vm.count("help"); }
+bool Context::help() const { return _vm.count("help"); }
+
+std::string Context::_onCommand(int argc, const char *argv[]) { return ""; }
 
 } // namespace server
 } // namespace ruralpi

@@ -18,14 +18,15 @@
 
 #pragma once
 
-#include <boost/program_options/options_description.hpp>
-#include <boost/program_options/variables_map.hpp>
+#include <boost/program_options.hpp>
+
+#include "common/context_base.h"
 
 namespace ruralpi {
 namespace server {
 
-struct Options {
-    Options(int argc, const char *argv[]);
+struct Context : public ContextBase {
+    Context(int argc, const char *argv[]);
 
     bool help() const;
     const auto &desc() const { return _desc; }
@@ -34,14 +35,10 @@ struct Options {
     int port;
 
 private:
+    std::string _onCommand(int argc, const char *argv[]);
+
     boost::program_options::options_description _desc;
     boost::program_options::variables_map _vm;
-};
-
-struct Context {
-    explicit Context(Options options);
-
-    const Options options;
 };
 
 } // namespace server

@@ -19,28 +19,32 @@
 #pragma once
 
 #include <boost/program_options.hpp>
+#include <functional>
+#include <string>
+#include <thread>
 
-#include "common/context_base.h"
+#include "common/scoped_file_descriptor.h"
 
 namespace ruralpi {
-namespace client {
 
-struct Context : public ContextBase {
-    Context(int argc, const char *argv[]);
+/**
+ * Single-threaded commands server, which accepts simple text commands (ending in new line) and
+ * invokes the `onCommand` handler.
+ */
+class CommandsServer {
+public:
+    // First argument is the command, the rest are its arguments
+    using OnCommandFn = std::function<std::string(int, const char *[])>;
 
-    bool help() const;
-    const auto &desc() const { return _desc; }
-
-    int nqueues;
-    std::string serverHost;
-    int serverPort;
+    CommandsServer(std::string pipeName, OnCommandFn onCommand);
+    ~CommandsServer();
 
 private:
-    std::string _onCommand(int argc, const char *argv[]);
+    std::string _pipeName;
+    OnCommandFn _onCommand;
 
-    boost::program_options::options_description _desc;
-    boost::program_options::variables_map _vm;
+    ScopedFileDescriptor _fd;
+    std::thread _thread;
 };
 
-} // namespace client
 } // namespace ruralpi

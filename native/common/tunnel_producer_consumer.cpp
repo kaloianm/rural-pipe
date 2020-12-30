@@ -21,8 +21,6 @@
 #include <boost/log/trivial.hpp>
 #include <chrono>
 #include <poll.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 
 #include "common/exception.h"
 #include "common/ip_parsers.h"
@@ -55,13 +53,7 @@ void debugLogDatagram(uint8_t const *data, size_t size) {
 } // namespace
 
 TunnelProducerConsumer::TunnelProducerConsumer(std::vector<int> tunnelFds)
-    : _tunnelFds(std::move(tunnelFds)) {}
-
-TunnelProducerConsumer::~TunnelProducerConsumer() = default;
-
-void TunnelProducerConsumer::start() {
-    assert(_receiveFromTunnelThreads.empty());
-
+    : _tunnelFds(std::move(tunnelFds)) {
     for (int i = 0; i < _tunnelFds.size(); i++) {
         const bool isSocket = [&] {
             struct stat s;
@@ -91,13 +83,15 @@ void TunnelProducerConsumer::start() {
     }
 }
 
-void TunnelProducerConsumer::stop() {
-    // Interrupt the producer/consumer threads and join them
-    _receiveFromTunnelTasksInterrupted.store(true);
-
+TunnelProducerConsumer::~TunnelProducerConsumer() {
     for (auto &t : _receiveFromTunnelThreads) {
         t.join();
     }
+}
+
+void TunnelProducerConsumer::interrupt() {
+    // Interrupt the producer/consumer threads and join them
+    _receiveFromTunnelTasksInterrupted.store(true);
 }
 
 void TunnelProducerConsumer::onTunnelFrameReady(TunnelFrameReader reader) {

@@ -18,22 +18,32 @@
 
 #pragma once
 
+#include <fcntl.h>
 #include <string>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 namespace ruralpi {
 
-class ScopedFileDescriptor {
+class FileDescriptor {
 public:
-    ScopedFileDescriptor(std::string desc, int fd);
-    ~ScopedFileDescriptor();
-    ScopedFileDescriptor(ScopedFileDescriptor &&);
+    FileDescriptor(const std::string &desc, int fd);
 
     operator int() const { return _fd; }
 
-private:
+protected:
+    FileDescriptor();
+
     // Description used for debugging and diagnostics purposes
     std::string _desc;
-    int _fd;
+    int _fd{-1};
+};
+
+class ScopedFileDescriptor : public FileDescriptor {
+public:
+    ScopedFileDescriptor(const std::string &desc, int fd);
+    ~ScopedFileDescriptor();
+    ScopedFileDescriptor(ScopedFileDescriptor &&);
 };
 
 } // namespace ruralpi

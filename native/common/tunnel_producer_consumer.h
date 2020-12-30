@@ -32,12 +32,7 @@ public:
     TunnelProducerConsumer(std::vector<int> tunnelFds);
     ~TunnelProducerConsumer();
 
-    // These methods match the order of instantiation and destruction of the tunnel
-    // producer/consumer in order to ensure there is no invalid memory accesses
-    using TunnelFramePipe::pipeTo;
-    void start();
-    void stop();
-    using TunnelFramePipe::unPipe;
+    void interrupt();
 
 private:
     // TunnelFramePipe methods
