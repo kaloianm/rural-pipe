@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "common/scoped_file_descriptor.h"
+#include "common/file_descriptor.h"
 #include "common/tunnel_frame.h"
 
 namespace ruralpi {

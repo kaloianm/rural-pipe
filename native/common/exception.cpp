@@ -29,18 +29,18 @@ Exception::Exception(boost::format formatter) : Exception(formatter.str()) {}
 
 const char *Exception::what() const noexcept { return _message.c_str(); }
 
-void Exception::throwFromErrno(const std::string &context) {
+void SystemException::throwFromErrno(const std::string &context) {
     if (context.empty())
-        throw Exception(boost::format("System error %s") % getLastError());
+        throw SystemException(boost::format("System error %s") % getLastError());
     else
-        throw Exception(boost::format("(%s): System error %s") % context % getLastError());
+        throw SystemException(boost::format("(%s): System error %s") % context % getLastError());
 }
 
-void Exception::throwFromErrno(const boost::format &context) { throwFromErrno(context.str()); }
+void SystemException::throwFromErrno(const boost::format &context) { throwFromErrno(context.str()); }
 
-void Exception::throwFromErrno() { throwFromErrno(""); }
+void SystemException::throwFromErrno() { throwFromErrno(""); }
 
-std::string Exception::getLastError() {
+std::string SystemException::getLastError() {
     BOOST_ASSERT(errno);
     const int savedErrno = errno;
 

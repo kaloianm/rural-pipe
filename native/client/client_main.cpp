@@ -60,7 +60,7 @@ void clientMain(Context &ctx) {
                                                     socket(AF_INET, SOCK_STREAM, 0));
 
         if (connect(config.fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
-            Exception::throwFromErrno("Failed to connect to server");
+            SystemException::throwFromErrno("Failed to connect to server");
 
         socketPC.addSocket(std::move(config));
     }
@@ -77,15 +77,11 @@ void clientMain(Context &ctx) {
 
 int main(int argc, const char *argv[]) {
     try {
-        ruralpi::client::Context ctx(argc, argv);
+        ruralpi::client::Context ctx;
+        if (ctx.start(argc, argv) == ruralpi::client::Context::kYes)
+            ruralpi::client::clientMain(ctx);
 
-        if (ctx.help()) {
-            std::cout << ctx.desc();
-            return 1;
-        }
-
-        ruralpi::client::clientMain(ctx);
-        return ctx.waitForCompletion();
+        return ctx.waitForExit();
     } catch (const std::exception &ex) {
         BOOST_LOG_TRIVIAL(fatal) << "Error occurred: " << ex.what();
         return 1;

@@ -31,34 +31,21 @@ TunnelFrameStream::~TunnelFrameStream() = default;
 void TunnelFrameStream::send(const TunnelFrameWriter &writer) {
     int numWritten = 0;
     while (numWritten < writer.totalSize()) {
-        int res = write(_fd, (void *)writer.begin(), writer.totalSize());
-        if (res < 0)
-            Exception::throwFromErrno("Failed to send tunnel frame");
-        numWritten += res;
+        numWritten += _fd.write((void *)writer.begin(), writer.totalSize());
     }
 
     BOOST_LOG_TRIVIAL(debug) << "Written frame of " << numWritten << " bytes";
 }
 
 TunnelFrameReader TunnelFrameStream::receive() {
-    int numRead = 0;
-    int res = read(_fd, (void *)&_buffer[0], sizeof(TunnelFrameHeader));
-    if (res < 0)
-        Exception::throwFromErrno("Failed to receive tunnel frame's header");
-    if (res == 0)
-        throw new Exception("Socket closed");
-    numRead += res;
+    int numRead = _fd.read((void *)&_buffer[0], sizeof(TunnelFrameHeader));
 
     int totalSize = ((TunnelFrameHeader *)_buffer)->desc.size;
     BOOST_LOG_TRIVIAL(debug) << "Received a header of a frame of size " << totalSize;
 
     while (numRead < totalSize) {
-        res = read(_fd, (void *)&_buffer[numRead], totalSize - numRead);
-        if (res < 0)
-            Exception::throwFromErrno("Failed to receive tunnel frame's body");
-        if (res == 0)
-            throw new Exception("Socket closed");
-        numRead += res;
+        numRead += read(_fd, (void *)&_buffer[numRead], totalSize - numRead);
+
         BOOST_LOG_TRIVIAL(debug) << "Received " << numRead << " bytes so far";
     }
 

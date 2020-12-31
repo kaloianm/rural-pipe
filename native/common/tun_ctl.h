@@ -21,7 +21,7 @@
 #include <string>
 #include <vector>
 
-#include "common/scoped_file_descriptor.h"
+#include "common/file_descriptor.h"
 
 namespace ruralpi {
 
@@ -38,11 +38,11 @@ public:
     /**
      * Returns the set of file descriptors mapped to this tunnel device's queues.
      */
-    std::vector<int> getQueues() const;
+    std::vector<FileDescriptor> getQueues() const;
 
 private:
     std::string _deviceName;
-    std::vector<ScopedFileDescriptor> _fds;
+    std::vector<FileDescriptor> _fds;
 };
 
 } // namespace ruralpi

@@ -21,7 +21,7 @@
 #include <mutex>
 
 #include "common/exception.h"
-#include "common/scoped_file_descriptor.h"
+#include "common/file_descriptor.h"
 #include "common/socket_producer_consumer.h"
 #include "common/tunnel_frame.h"
 #include "common/tunnel_frame_stream.h"
@@ -44,9 +44,7 @@ struct TestFifo {
               auto fifoPath = fs::temp_directory_path() / "rural_pipe_test";
               remove(fifoPath.c_str());
 
-              if (mkfifo(fifoPath.c_str(), 0666) < 0)
-                  Exception::throwFromErrno("Unable to create the Fifo device");
-
+              SYSCALL(mkfifo(fifoPath.c_str(), 0666));
               return open(fifoPath.c_str(), O_RDWR);
           }()) {}
 };
@@ -124,7 +122,7 @@ void tunnelFrameStreamTests() {
 
 void tunnelProducerConsumerTests() {
     TestFifo pipes[2];
-    TunnelProducerConsumer tunnelPC(std::vector<int>{pipes[0].fd, pipes[1].fd});
+    TunnelProducerConsumer tunnelPC(std::vector<FileDescriptor>{pipes[0].fd, pipes[1].fd});
 
     struct TestPipe : public TunnelFramePipe {
         TestPipe(TunnelFramePipe &pipe) { pipeTo(pipe); }

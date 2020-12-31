@@ -22,7 +22,6 @@
 #include <linux/if_tun.h>
 #include <string.h>
 #include <sys/ioctl.h>
-#include <unistd.h>
 
 #include "common/exception.h"
 
@@ -30,6 +29,7 @@ namespace ruralpi {
 namespace {
 
 const char kDeviceName[] = "RPI";
+const char kSystemTunnelDevice[] = "/dev/net/tun";
 
 } // namespace
 
@@ -44,14 +44,13 @@ TunCtl::TunCtl(std::string deviceName, int numQueues) : _deviceName(std::move(de
     strcpy(ifr.ifr_name, _deviceName.c_str());
 
     for (int i = 0; i < numQueues; i++) {
-        _fds.emplace_back("Tunnel device", open("/dev/net/tun", O_RDWR));
-        if (ioctl(_fds[i], TUNSETIFF, (void *)&ifr))
-            Exception::throwFromErrno("Configuring tunnel device");
+        _fds.emplace_back(kSystemTunnelDevice, open(kSystemTunnelDevice, O_RDWR));
+        SYSCALL_MSG(ioctl(_fds[i], TUNSETIFF, (void *)&ifr), "Error configuring tunnel device");
     }
 }
 
-std::vector<int> TunCtl::getQueues() const {
-    std::vector<int> fds;
+std::vector<FileDescriptor> TunCtl::getQueues() const {
+    std::vector<FileDescriptor> fds;
     for (auto &fd : _fds)
         fds.emplace_back(fd);
     return fds;

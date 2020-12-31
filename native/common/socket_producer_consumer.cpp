@@ -76,13 +76,12 @@ SocketProducerConsumer::~SocketProducerConsumer() {
 void SocketProducerConsumer::addSocket(SocketConfig config) {
     const bool isSocket = [&] {
         struct stat s;
-        if (fstat(config.fd, &s) < 0)
-            Exception::throwFromErrno("Error while checking the tunnel file descriptor's type");
+        SYSCALL(fstat(config.fd, &s));
         return S_ISSOCK(s.st_mode);
     }();
 
     if (!isSocket)
-        BOOST_LOG_TRIVIAL(warning) << "File descriptor is not a socket";
+        BOOST_LOG_TRIVIAL(warning) << "File descriptor " << config.fd << " is not a socket";
 
     BOOST_LOG_TRIVIAL(info) << "Starting thread for socket file descriptor " << config.fd;
 

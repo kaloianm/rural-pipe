@@ -32,6 +32,14 @@ public:
 
     const char *what() const noexcept override;
 
+private:
+    std::string _message;
+};
+
+class SystemException : public Exception {
+public:
+    using Exception::Exception;
+
     static void throwFromErrno(const std::string &context);
     static void throwFromErrno(const boost::format &context);
     static void throwFromErrno();
@@ -40,9 +48,16 @@ public:
      * Returns a formatted last system error information from `errno`.
      */
     static std::string getLastError();
-
-private:
-    std::string _message;
 };
+
+#define SYSCALL_MSG(x, msg)                                                                        \
+    [&] {                                                                                          \
+        int res = x;                                                                               \
+        if (res < 0)                                                                               \
+            SystemException::throwFromErrno(msg);                                                  \
+        return res;                                                                                \
+    }()
+
+#define SYSCALL(x) SYSCALL_MSG(x, #x)
 
 } // namespace ruralpi

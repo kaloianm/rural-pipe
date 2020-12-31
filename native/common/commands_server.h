@@ -23,7 +23,7 @@
 #include <string>
 #include <thread>
 
-#include "common/scoped_file_descriptor.h"
+#include "common/file_descriptor.h"
 
 namespace ruralpi {
 

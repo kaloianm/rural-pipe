@@ -16,22 +16,35 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
-#include "common/scoped_file_descriptor.h"
+#include "common/file_descriptor.h"
 
 #include <boost/log/trivial.hpp>
+#include <unistd.h>
 
 #include "common/exception.h"
 
 namespace ruralpi {
 
 FileDescriptor::FileDescriptor(const std::string &desc, int fd) : _desc(desc), _fd(fd) {
-    if (_fd < 0) {
-        Exception::throwFromErrno(boost::format("Could not open file descriptor (%d): %s") % _fd %
-                                  _desc);
-    }
+    SYSCALL_MSG(_fd, boost::format("Could not open file descriptor (%d): %s") % _fd % _desc);
 }
 
 FileDescriptor::FileDescriptor() = default;
+
+int FileDescriptor::read(void *buf, size_t nbytes) {
+    int res =
+        SYSCALL_MSG(::read(_fd, buf, nbytes),
+                    boost::format("Failed to read from file descriptor (%d): %s") % _fd % _desc);
+    if (res == 0)
+        throw SystemException(boost::format("Failed to read from closed file descriptor (%d): %s") %
+                              _fd % _desc);
+    return res;
+}
+
+int FileDescriptor::write(void const *buf, size_t size) {
+    return SYSCALL_MSG(::write(_fd, buf, size),
+                       boost::format("Failed to write on file descriptor (%d): %s") % _fd % _desc);
+}
 
 ScopedFileDescriptor::ScopedFileDescriptor(const std::string &desc, int fd)
     : FileDescriptor(desc, fd) {
@@ -44,7 +57,7 @@ ScopedFileDescriptor::~ScopedFileDescriptor() {
 
         if (close(_fd) < 0) {
             BOOST_LOG_TRIVIAL(debug) << "Failed to close file descriptor " << _fd << " (" << _desc
-                                     << "): " << Exception::getLastError();
+                                     << "): " << SystemException::getLastError();
         }
 
         return;

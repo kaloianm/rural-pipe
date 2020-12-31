@@ -52,23 +52,23 @@ void debugLogDatagram(uint8_t const *data, size_t size) {
 
 } // namespace
 
-TunnelProducerConsumer::TunnelProducerConsumer(std::vector<int> tunnelFds)
+TunnelProducerConsumer::TunnelProducerConsumer(std::vector<FileDescriptor> tunnelFds)
     : _tunnelFds(std::move(tunnelFds)) {
     for (int i = 0; i < _tunnelFds.size(); i++) {
+        auto fd = _tunnelFds[i];
+
         const bool isSocket = [&] {
             struct stat s;
-            if (fstat(_tunnelFds[i], &s) < 0)
-                Exception::throwFromErrno("Error while checking the tunnel file descriptor's type");
+            SYSCALL(fstat(fd, &s));
             return S_ISSOCK(s.st_mode);
         }();
 
         if (!isSocket)
-            BOOST_LOG_TRIVIAL(warning) << "File descriptor is not a socket";
+            BOOST_LOG_TRIVIAL(warning) << "File descriptor " << fd << " is not a socket";
 
-        int fd = _tunnelFds[i];
         BOOST_LOG_TRIVIAL(info) << "Starting thread for tunnel file descriptor " << fd;
 
-        _receiveFromTunnelThreads.emplace_back([this, fd] {
+        _receiveFromTunnelThreads.emplace_back([this, fd = std::move(fd)] {
             try {
                 _receiveFromTunnelLoop(fd);
 
@@ -101,14 +101,12 @@ void TunnelProducerConsumer::onTunnelFrameReady(TunnelFrameReader reader) {
         // Ensure that the same source/destination address pair always uses the same tunnel device
         // queue
         const auto &ip = IP::read(reader.data());
-        int tunnelFd = _tunnelFds[(ip.saddr + ip.daddr) % _tunnelFds.size()];
-        int res = write(tunnelFd, reader.data(), reader.size());
-        if (res < 0)
-            Exception::throwFromErrno("Error writing datagram");
+        auto &tunnelFd = _tunnelFds[(ip.saddr + ip.daddr) % _tunnelFds.size()];
+        tunnelFd.write(reader.data(), reader.size());
     }
 }
 
-void TunnelProducerConsumer::_receiveFromTunnelLoop(int tunnelFd) {
+void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor tunnelFd) {
     uint8_t buffer[kTunnelFrameMaxSize];
 
     while (true) {
@@ -131,14 +129,12 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(int tunnelFd) {
                 pollfd fd;
                 fd.fd = tunnelFd;
                 fd.events = POLLIN;
-                res = poll(
+                res = SYSCALL(poll(
                     &fd, 1,
                     (numDatagramsWritten ? Milliseconds(kWaitForBatch) : Milliseconds(kWaitForData))
-                        .count());
+                        .count()));
                 if (res > 0)
                     break;
-                if (res < 0)
-                    Exception::throwFromErrno("Error while waiting for the next datagram");
                 if (numDatagramsWritten) // res == 0
                     break;
             }
@@ -150,8 +146,8 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(int tunnelFd) {
 
             // Check how much is the size of the next incoming datagram
             int nextDatagramSize;
-            if (ioctl(tunnelFd, FIONREAD, &nextDatagramSize) < 0)
-                Exception::throwFromErrno("Error while checking the next datagram size");
+            SYSCALL_MSG(ioctl(tunnelFd, FIONREAD, &nextDatagramSize),
+                        "Error while checking the next datagram size");
 
             if (nextDatagramSize > writer.remainingBytes()) {
                 assert(numDatagramsWritten);
@@ -159,11 +155,9 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(int tunnelFd) {
             }
 
             // Read the incoming datagram in the frame
-            int nRead = read(tunnelFd, (void *)writer.data(), writer.remainingBytes());
+            int nRead = tunnelFd.read((void *)writer.data(), writer.remainingBytes());
             BOOST_LOG_TRIVIAL(debug)
                 << "Received " << nRead << " bytes from tunnel socket " << tunnelFd;
-            if (nRead < 0)
-                Exception::throwFromErrno("Error while reading tunnel socket data");
 
             debugLogDatagram(writer.data(), nRead);
             writer.onDatagramWritten(nRead);

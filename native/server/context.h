@@ -18,27 +18,21 @@
 
 #pragma once
 
-#include <boost/program_options.hpp>
-
 #include "common/context_base.h"
 
 namespace ruralpi {
 namespace server {
 
 struct Context : public ContextBase {
-    Context(int argc, const char *argv[]);
+    Context();
+    ~Context();
 
-    bool help() const;
-    const auto &desc() const { return _desc; }
+    ShouldStart start(int argc, const char *argv[]);
 
-    int nqueues;
     int port;
 
 private:
     std::string _onCommand(int argc, const char *argv[]);
-
-    boost::program_options::options_description _desc;
-    boost::program_options::variables_map _vm;
 };
 
 } // namespace server

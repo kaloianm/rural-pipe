@@ -20,11 +20,11 @@ Import('env')
 common = env.Library(
     target='common',
     source=[
-        'command_server.cpp',
+        'commands_server.cpp',
         'context_base.cpp',
         'exception.cpp',
+        'file_descriptor.cpp',
         'ip_parsers.cpp',
-        'scoped_file_descriptor.cpp',
         'socket_producer_consumer.cpp',
         'tun_ctl.cpp',
         'tunnel_frame_stream.cpp',

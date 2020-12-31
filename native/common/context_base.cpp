@@ -18,19 +18,56 @@
 
 #include "common/context_base.h"
 
+#include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/utility/setup/file.hpp>
+#include <iostream>
 
 namespace ruralpi {
-namespace {
 
+namespace fs = boost::filesystem;
 namespace logging = boost::log;
+namespace po = boost::program_options;
 
-void initLogging(const std::string &serviceName) {
-    logging::add_file_log(logging::keywords::file_name = serviceName + "_%N.log",
+ContextBase::ContextBase(std::string serviceName)
+    : _desc(boost::str(boost::format("RuralPipe %s options") % serviceName)),
+      _serviceName(std::move(serviceName)) {
+    // clang-format off
+    _desc.add_options()
+        ("help", "Produces this help message")
+        ("settings.nqueues", po::value<int>()->default_value(1), "Number of queues/threads to instantiate to listen on the tunnel device")
+    ;
+    // clang-format on
+}
+
+ContextBase::~ContextBase() = default;
+
+ContextBase::ShouldStart ContextBase::start(int argc, const char *argv[],
+                                            CommandsServer::OnCommandFn onCommand) {
+    // Parse the common options before initialising the logging system so that any errors are output
+    // on the command line
+    const fs::path configPath(fs::current_path() /
+                              fs::path(boost::str(boost::format("%s.cfg") % _serviceName)));
+    if (fs::exists(configPath))
+        po::store(po::parse_config_file(configPath.c_str(), _desc, true /* allow_unregistered */),
+                  _vm);
+    po::store(po::parse_command_line(argc, argv, _desc), _vm);
+
+    if (_vm.count("help")) {
+        std::cout << _desc;
+        exit(1);
+        return kHelpOnly;
+    }
+
+    po::notify(_vm);
+
+    nqueues = _vm["settings.nqueues"].as<int>();
+
+    // Initialise the logging system
+    logging::add_file_log(logging::keywords::file_name = _serviceName + "_%N.log",
                           logging::keywords::rotation_size = 10 * 1024 * 1024,
                           logging::keywords::time_based_rotation =
                               logging::sinks::file::rotation_at_time_point(0, 0, 0),
@@ -40,25 +77,34 @@ void initLogging(const std::string &serviceName) {
     logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
 
     logging::add_common_attributes();
+
+    // Instantiate the commands server so that the controlling script can start polling for startup
+    // state information
+    _cmdServer.emplace(_serviceName, std::move(onCommand));
+
+    return kYes;
 }
 
-} // namespace
-
-ContextBase::ContextBase(std::string serviceName, CommandsServer::OnCommandFn onCommand) {
-    initLogging(serviceName);
-
-    _cmdServer.emplace(serviceName, std::move(onCommand));
-}
-
-ContextBase::~ContextBase() {}
-
-int ContextBase::waitForCompletion() {
+int ContextBase::waitForExit() {
     std::unique_lock<std::mutex> ul(_mutex);
-    while (!_retVal) {
+    BOOST_ASSERT(!_waitingForExit);
+    _waitingForExit = true;
+
+    while (!_exitCode) {
         _condVar.wait(ul);
     }
 
-    return *_retVal;
+    return *_exitCode;
 }
+
+void ContextBase::exit(int exitCode) {
+    std::unique_lock<std::mutex> ul(_mutex);
+    if (_exitCode)
+        return;
+    _exitCode = exitCode;
+    _condVar.notify_all();
+}
+
+void ContextBase::exit(const Exception &ex) { exit(1); }
 
 } // namespace ruralpi

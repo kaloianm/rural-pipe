@@ -16,34 +16,26 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
-#pragma once
+#include "common/commands_server.h"
 
-#include <fcntl.h>
-#include <string>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include <boost/filesystem.hpp>
+#include <boost/log/trivial.hpp>
 
 namespace ruralpi {
+namespace {
 
-class FileDescriptor {
-public:
-    FileDescriptor(const std::string &desc, int fd);
+namespace fs = boost::filesystem;
 
-    operator int() const { return _fd; }
+ScopedFileDescriptor openPipe(const std::string &pipeName) {
+    auto fifoPath = fs::temp_directory_path() / pipeName;
+    return ScopedFileDescriptor(fifoPath.string(), open(fifoPath.c_str(), O_RDWR));
+}
 
-protected:
-    FileDescriptor();
+} // namespace
 
-    // Description used for debugging and diagnostics purposes
-    std::string _desc;
-    int _fd{-1};
-};
+CommandsServer::CommandsServer(std::string pipeName, OnCommandFn onCommand)
+    : _pipeName(std::move(pipeName)), _onCommand(std::move(onCommand)), _fd(openPipe(_pipeName)) {}
 
-class ScopedFileDescriptor : public FileDescriptor {
-public:
-    ScopedFileDescriptor(const std::string &desc, int fd);
-    ~ScopedFileDescriptor();
-    ScopedFileDescriptor(ScopedFileDescriptor &&);
-};
+CommandsServer::~CommandsServer() {}
 
 } // namespace ruralpi

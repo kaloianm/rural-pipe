@@ -19,37 +19,30 @@
 
 #include "server/context.h"
 
-#include <boost/filesystem.hpp>
-#include <boost/program_options.hpp>
-
 namespace ruralpi {
 namespace server {
 
-namespace fs = boost::filesystem;
 namespace po = boost::program_options;
 
-Context::Context(int argc, const char *argv[])
-    : ContextBase("server",
-                  [this](int argc, const char *argv[]) { return _onCommand(argc, argv); }),
-      _desc("Server options") {
+Context::Context() : ContextBase("server") {
     // clang-format off
     _desc.add_options()
-        ("help", "Produces this help message")
-        ("settings.nqueues", po::value<int>()->default_value(1), "Number of queues/threads to instantiate to listen on the tunnel device")
         ("settings.port", po::value<int>()->default_value(50003), "Port on which to listen for connections")
     ;
     // clang-format on
-
-    const fs::path configPath(fs::current_path() / fs::path("server.cfg"));
-    po::store(po::parse_config_file(configPath.c_str(), _desc, true /* allow_unregistered */), _vm);
-    po::store(po::parse_command_line(argc, argv, _desc), _vm);
-    po::notify(_vm);
-
-    nqueues = _vm["settings.nqueues"].as<int>();
-    port = _vm["settings.port"].as<int>();
 }
 
-bool Context::help() const { return _vm.count("help"); }
+Context::~Context() = default;
+
+Context::ShouldStart Context::start(int argc, const char *argv[]) {
+    ShouldStart shouldStart = ContextBase::start(
+        argc, argv, [this](int argc, const char *argv[]) { return _onCommand(argc, argv); });
+    if (shouldStart == kYes) {
+        port = _vm["settings.port"].as<int>();
+    }
+
+    return shouldStart;
+}
 
 std::string Context::_onCommand(int argc, const char *argv[]) { return ""; }
 

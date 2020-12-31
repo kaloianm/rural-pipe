@@ -50,7 +50,7 @@ void serverMain(Context &ctx) {
         addr.sin_port = htons(ctx.port);
 
         if (bind(serverSock, (sockaddr *)&addr, sizeof(addr)) < 0)
-            Exception::throwFromErrno("Failed to bind to port");
+            SystemException::throwFromErrno("Failed to bind to port");
     }
 
     std::cout << "Rural Pipe server running" << std::endl; // Indicates to the startup script that
@@ -61,7 +61,7 @@ void serverMain(Context &ctx) {
     // Start accepting connections from clients
     while (true) {
         if (listen(serverSock, 1) < 0)
-            Exception::throwFromErrno("Failed to listen on port");
+            SystemException::throwFromErrno("Failed to listen on port");
 
         sockaddr_in addr;
         int addrlen;
@@ -84,15 +84,11 @@ void serverMain(Context &ctx) {
 
 int main(int argc, const char *argv[]) {
     try {
-        ruralpi::server::Context ctx(argc, argv);
+        ruralpi::server::Context ctx;
+        if (ctx.start(argc, argv) == ruralpi::server::Context::kYes)
+            ruralpi::server::serverMain(ctx);
 
-        if (ctx.help()) {
-            std::cout << ctx.desc();
-            return 1;
-        }
-
-        ruralpi::server::serverMain(ctx);
-        return ctx.waitForCompletion();
+        return ctx.waitForExit();
     } catch (const std::exception &ex) {
         BOOST_LOG_TRIVIAL(fatal) << "Error occurred: " << ex.what();
         return 1;

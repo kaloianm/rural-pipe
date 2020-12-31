@@ -19,28 +19,68 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/program_options.hpp>
 #include <condition_variable>
 #include <functional>
 #include <mutex>
 #include <string>
 
-#include "common/command_server.h"
+#include "common/commands_server.h"
+#include "common/exception.h"
 
 namespace ruralpi {
 
+/**
+ * There is a single instance of this object per executable and it represents the "context" of the
+ * running process with things, such as the configuration options, exit code, the command server,
+ * etc., hanging off of it.
+ */
 class ContextBase {
 public:
-    ContextBase(std::string serviceName, CommandsServer::OnCommandFn onCommand);
+    ContextBase(std::string serviceName);
     ~ContextBase();
 
-    int waitForCompletion();
+    /**
+     * Optional method to initialise the logging system and start the process. It can be skipped in
+     * unit-tests in which case the logging will be to stdout/stderr.
+     */
+    enum ShouldStart { kYes, kHelpOnly };
+    ShouldStart start(int argc, const char *argv[], CommandsServer::OnCommandFn onCommand);
+
+    /**
+     * Blocks until `exit` below is called.
+     */
+    int waitForExit();
+
+    /**
+     * Must be called in order to cause the process to terminate. Only the first invocation will be
+     * taken into account, the following ones will be ignored
+     */
+    void exit(int exitCode);
+    void exit(const Exception &ex);
+
+    // Common configuration options
+    int nqueues;
+
+protected:
+    boost::program_options::options_description _desc;
+    boost::program_options::variables_map _vm;
 
 private:
+    const std::string _serviceName;
+
+    // This is optional, so it can be constructed after the constructor of ContextBase has finished
+    boost::optional<CommandsServer> _cmdServer;
+
+    // Protects the mutable state below
     std::mutex _mutex;
     std::condition_variable _condVar;
-    boost::optional<int> _retVal;
 
-    boost::optional<CommandsServer> _cmdServer;
+    bool _waitingForExit{false};
+
+    // Will be set when `exit` is called (on the first invocation of `exit` will be taken into
+    // account, the following ones will be ignored)
+    boost::optional<int> _exitCode;
 };
 
 } // namespace ruralpi

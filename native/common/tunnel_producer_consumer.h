@@ -23,13 +23,14 @@
 #include <thread>
 #include <vector>
 
+#include "common/file_descriptor.h"
 #include "common/tunnel_frame.h"
 
 namespace ruralpi {
 
 class TunnelProducerConsumer : public TunnelFramePipe {
 public:
-    TunnelProducerConsumer(std::vector<int> tunnelFds);
+    TunnelProducerConsumer(std::vector<FileDescriptor> tunnelFds);
     ~TunnelProducerConsumer();
 
     void interrupt();
@@ -43,10 +44,10 @@ private:
      * `_tunnelFds`). They receive incoming datagrams, pack them into TunneFrame(s) and passes them
      * downwstream to the pipe attached to via 'TunnelFramePipe::pipeTo'.
      */
-    void _receiveFromTunnelLoop(int tunnelFd);
+    void _receiveFromTunnelLoop(FileDescriptor tunnelFd);
 
     // Vector with the Tunnel device's file descriptors
-    std::vector<int> _tunnelFds;
+    std::vector<FileDescriptor> _tunnelFds;
 
     // Serves as a source for sequencing the tunnel frames
     std::atomic<uint64_t> _seqNum{0};
