@@ -16,10 +16,10 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
-#include <boost/asio/ip/address.hpp>
+#include <boost/asio.hpp>
+#include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/trivial.hpp>
 #include <iostream>
-#include <netinet/in.h>
 #include <sys/socket.h>
 
 #include "common/exception.h"
@@ -32,50 +32,73 @@ namespace ruralpi {
 namespace server {
 namespace {
 
-void serverMain(Context &ctx) {
-    BOOST_LOG_TRIVIAL(info) << "Rural Pipe server starting on port " << ctx.port << " with "
-                            << ctx.nqueues << " queues";
+namespace asio = boost::asio;
 
-    // Create the server-side Tunnel device
-    TunCtl tunnel("rpis", ctx.nqueues);
-    TunnelProducerConsumer tunnelPC(tunnel.getQueues());
-    SocketProducerConsumer socketPC(false /* isClient */, tunnelPC);
-
-    // Bind to the server's listening port
-    ScopedFileDescriptor serverSock("Server main socket", socket(AF_INET, SOCK_STREAM, 0));
-    {
+class Server {
+public:
+    Server(Context &ctx, SocketProducerConsumer &socketPC)
+        : _socketPC(socketPC),
+          _serverSock("Server main socket", ::socket(AF_INET, SOCK_STREAM, 0)) {
         sockaddr_in addr;
         addr.sin_family = AF_INET;
         addr.sin_addr.s_addr = INADDR_ANY;
         addr.sin_port = htons(ctx.port);
 
-        if (bind(serverSock, (sockaddr *)&addr, sizeof(addr)) < 0)
-            SystemException::throwFromErrno("Failed to bind to port");
+        SYSCALL(::bind(_serverSock, (sockaddr *)&addr, sizeof(addr)));
+
+        _thread = std::thread([this] { _acceptConnection(); });
     }
+
+    ~Server() {
+        if (_thread.joinable())
+            _thread.join();
+
+        BOOST_LOG_TRIVIAL(info) << "Server completed";
+    }
+
+private:
+    void _acceptConnection() {
+        while (true) {
+            SYSCALL(::listen(_serverSock, 1));
+
+            sockaddr_in addr;
+            int addrlen;
+            int clientSocket =
+                ::accept(_serverSock, (struct sockaddr *)&addr, (socklen_t *)&addrlen);
+            if (clientSocket < 0) {
+                BOOST_LOG_TRIVIAL(info) << "Failed to accept connection";
+                continue;
+            }
+
+            auto addr_v4 = asio::ip::address_v4(ntohl(addr.sin_addr.s_addr));
+            BOOST_LOG_TRIVIAL(info) << "Accepted connection from " << addr_v4;
+
+            _socketPC.addSocket(SocketProducerConsumer::SocketConfig{
+                ScopedFileDescriptor(addr_v4.to_string(), clientSocket)});
+        }
+    }
+
+    SocketProducerConsumer &_socketPC;
+    ScopedFileDescriptor _serverSock;
+    std::thread _thread;
+};
+
+void serverMain(Context &ctx) {
+    BOOST_LOG_NAMED_SCOPE("serverMain");
+    BOOST_LOG_TRIVIAL(info) << "Rural Pipe server starting on port " << ctx.port << " with "
+                            << ctx.nqueues << " queues";
+
+    // Create the server-side Tunnel device
+    TunCtl tunnel("rpis", ctx.nqueues);
+    TunnelProducerConsumer tunnelPC(tunnel.getQueues(), tunnel.getMTU());
+    SocketProducerConsumer socketPC(false /* isClient */, tunnelPC);
+    Server server(ctx, socketPC);
 
     std::cout << "Rural Pipe server running" << std::endl; // Indicates to the startup script that
                                                            // the tunnel device has been created and
                                                            // that it can configure the routing
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe server running";
-
-    // Start accepting connections from clients
-    while (true) {
-        if (listen(serverSock, 1) < 0)
-            SystemException::throwFromErrno("Failed to listen on port");
-
-        sockaddr_in addr;
-        int addrlen;
-        int clientSocket = accept(serverSock, (struct sockaddr *)&addr, (socklen_t *)&addrlen);
-        if (clientSocket < 0) {
-            BOOST_LOG_TRIVIAL(info) << "Failed to accept connection";
-            continue;
-        }
-
-        auto addr_v4 = boost::asio::ip::address_v4(ntohl(addr.sin_addr.s_addr));
-        BOOST_LOG_TRIVIAL(info) << "Accepted connection from " << addr_v4;
-
-        socketPC.addSocket(SocketProducerConsumer::SocketConfig{addr_v4.to_string(), clientSocket});
-    }
+    ctx.waitForExit();
 }
 
 } // namespace

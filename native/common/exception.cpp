@@ -36,7 +36,9 @@ void SystemException::throwFromErrno(const std::string &context) {
         throw SystemException(boost::format("(%s): System error %s") % context % getLastError());
 }
 
-void SystemException::throwFromErrno(const boost::format &context) { throwFromErrno(context.str()); }
+void SystemException::throwFromErrno(const boost::format &context) {
+    throwFromErrno(context.str());
+}
 
 void SystemException::throwFromErrno() { throwFromErrno(""); }
 
@@ -48,5 +50,12 @@ std::string SystemException::getLastError() {
     return boost::str(boost::format("(%d): %s") % savedErrno %
                       strerror_r(savedErrno, buf, sizeof(buf)));
 }
+
+ScopedGuard::~ScopedGuard() {
+    if (_fn)
+        _fn();
+}
+
+ScopedGuard::ScopedGuard(ScopedGuard &&other) = default;
 
 } // namespace ruralpi

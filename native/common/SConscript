@@ -27,7 +27,6 @@ common = env.Library(
         'ip_parsers.cpp',
         'socket_producer_consumer.cpp',
         'tun_ctl.cpp',
-        'tunnel_frame_stream.cpp',
         'tunnel_frame.cpp',
         'tunnel_producer_consumer.cpp',
     ],

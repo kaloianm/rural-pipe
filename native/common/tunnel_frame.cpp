@@ -18,7 +18,7 @@
 
 #include "common/tunnel_frame.h"
 
-#include <cassert>
+#include <boost/log/trivial.hpp>
 #include <cstring>
 
 #include "common/exception.h"
@@ -31,14 +31,28 @@ namespace {
 
 const uint8_t kVersion = 1;
 
+class NotYetReadyTunnelFramePipe : public TunnelFramePipe {
+public:
+    NotYetReadyTunnelFramePipe() : TunnelFramePipe(nullptr) {}
+
+    void onTunnelFrameReady(TunnelFrameBuffer buf) {
+        BOOST_LOG_TRIVIAL(debug) << "Received frame before the pipe was configured";
+        throw Exception("Not yet ready to receive frames");
+    }
+
+} kNotYetReadyTunnelFramePipe;
+
 } // namespace
 
-TunnelFrameReader::TunnelFrameReader(uint8_t const *data, size_t size)
-    : _begin(data), _current(_begin), _end(_begin + size) {
+TunnelFrameReader::TunnelFrameReader(const ConstTunnelFrameBuffer &buf)
+    : _begin(buf.data), _current(_begin), _end(_begin + buf.size) {
     const auto &hdr = header();
     if (hdr.desc.version != kVersion)
         throw Exception(format("Unrecognised tunnel frame version %1%") % hdr.desc.version);
 }
+
+TunnelFrameReader::TunnelFrameReader(const TunnelFrameBuffer &buf)
+    : TunnelFrameReader(ConstTunnelFrameBuffer{buf.data, buf.size}) {}
 
 bool TunnelFrameReader::next() {
     if (_current == _begin)
@@ -49,24 +63,25 @@ bool TunnelFrameReader::next() {
     return size() > 0;
 }
 
-TunnelFrameWriter::TunnelFrameWriter(uint8_t *data, size_t size)
-    : _begin(data), _current(_begin + sizeof(TunnelFrameHeader)), _end(_begin + size) {}
+TunnelFrameWriter::TunnelFrameWriter(const TunnelFrameBuffer &buf)
+    : _begin(buf.data), _current(_begin + sizeof(TunnelFrameHeader)), _end(_begin + buf.size) {
+    header().desc.size = 0;
+}
 
 void TunnelFrameWriter::onDatagramWritten(size_t size) {
     ((TunnelFrameDatagramSeparator *)_current)->size = size;
     _current += sizeof(TunnelFrameDatagramSeparator) + size;
 }
 
-void TunnelFrameWriter::close(uint64_t seqNum) {
+void TunnelFrameWriter::close() {
     onDatagramWritten(0);
 
     auto &hdr = *((TunnelFrameHeader *)_begin);
     hdr.desc.version = kVersion;
     hdr.desc.flags = 0;
-    hdr.desc.size = totalSize();
+    hdr.desc.size = _current - _begin;
     // TODO: Properly populate the signature field
     strcpy((char *)&hdr.signature, "---- RURAL PIPE SIGNATURE ----");
-    hdr.seqNum = seqNum;
 }
 
 void TunnelFrameWriter::appendBytes(uint8_t const *ptr, size_t size) {
@@ -78,19 +93,32 @@ void TunnelFrameWriter::appendString(const char str[]) {
     appendBytes((uint8_t const *)str, strlen(str) + 1);
 }
 
-TunnelFramePipe::TunnelFramePipe() = default;
+TunnelFramePipe::TunnelFramePipe() : TunnelFramePipe(&kNotYetReadyTunnelFramePipe) {}
 
-void TunnelFramePipe::pipeTo(TunnelFramePipe &pipe) {
-    assert(_pipe == nullptr);
-    assert(pipe._pipe == nullptr);
+TunnelFramePipe::TunnelFramePipe(TunnelFramePipe *pipe) : _pipe(pipe) {}
+
+void TunnelFramePipe::pipeInvoke(TunnelFrameBuffer buf) {
+    std::lock_guard<std::mutex> lg(_pipe->_mutex);
+    _pipe->onTunnelFrameReady(buf);
+}
+
+void TunnelFramePipe::pipeAttach(TunnelFramePipe &pipe) {
+    std::lock_guard<std::mutex> lgThis(_mutex);
+    std::lock_guard<std::mutex> lgOther(pipe._mutex);
+
+    BOOST_ASSERT(_pipe == &kNotYetReadyTunnelFramePipe);
+    BOOST_ASSERT(pipe._pipe == &kNotYetReadyTunnelFramePipe);
 
     _pipe = &pipe;
     pipe._pipe = this;
 }
 
-void TunnelFramePipe::unPipe() {
-    _pipe->_pipe = nullptr;
-    _pipe = nullptr;
+void TunnelFramePipe::pipeDetach() {
+    std::lock_guard<std::mutex> lgThis(_mutex);
+    std::lock_guard<std::mutex> lgOther(_pipe->_mutex);
+
+    _pipe->_pipe = &kNotYetReadyTunnelFramePipe;
+    _pipe = &kNotYetReadyTunnelFramePipe;
 }
 
 } // namespace ruralpi

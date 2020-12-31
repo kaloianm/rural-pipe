@@ -18,43 +18,58 @@
 
 #include "common/socket_producer_consumer.h"
 
+#include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/uuid/random_generator.hpp>
+#include <boost/uuid/uuid_io.hpp>
 #include <chrono>
 #include <poll.h>
 
 #include "common/exception.h"
-#include "common/tunnel_frame_stream.h"
 
 namespace ruralpi {
 namespace {
 
-std::string initialTunnelFrameExchange(TunnelFrameStream &stream, bool isClient) {
+boost::uuids::basic_random_generator<boost::mt19937> uuidGen;
+
+struct InitalExchangeResult {
+    std::string identifier;
+    boost::uuids::uuid sessionId;
+};
+
+InitalExchangeResult initialTunnelFrameExchange(TunnelFrameStream &stream, bool isClient) {
     uint8_t buffer[512];
 
     if (isClient) {
-        TunnelFrameWriter writer(buffer, sizeof(buffer));
+        TunnelFrameWriter writer({buffer, sizeof(buffer)});
+        writer.header().sessionId = uuidGen();
+        writer.header().seqNum = TunnelFrameHeader::kInitialSeqNum;
         strcpy(((char *)((InitTunnelFrame *)writer.data())->identifier), "RuralPipeClient");
         writer.onDatagramWritten(16);
-        writer.close(TunnelFrameHeader::kInitialSeqNum);
-        stream.send(writer);
+        writer.close();
+        stream.send(writer.buffer());
 
-        auto reader = stream.receive();
+        TunnelFrameReader reader(stream.receive());
         if (!reader.next())
             throw Exception("Client received invalid initial frame response");
 
-        return std::string(((InitTunnelFrame const *)reader.data())->identifier);
+        return {std::string(((InitTunnelFrame const *)reader.data())->identifier),
+                reader.header().sessionId};
     } else {
-        auto reader = stream.receive();
+        TunnelFrameReader reader(stream.receive());
         if (!reader.next())
             throw Exception("Server received invalid initial frame");
 
-        TunnelFrameWriter writer(buffer, sizeof(buffer));
+        TunnelFrameWriter writer({buffer, sizeof(buffer)});
+        writer.header().sessionId = reader.header().sessionId;
+        writer.header().seqNum = TunnelFrameHeader::kInitialSeqNum;
         strcpy(((char *)((InitTunnelFrame *)writer.data())->identifier), "RuralPipeServer");
         writer.onDatagramWritten(16);
-        writer.close(TunnelFrameHeader::kInitialSeqNum);
-        stream.send(writer);
+        writer.close();
+        stream.send(writer.buffer());
 
-        return std::string(((InitTunnelFrame const *)reader.data())->identifier);
+        return {std::string(((InitTunnelFrame const *)reader.data())->identifier),
+                reader.header().sessionId};
     }
 }
 
@@ -62,15 +77,17 @@ std::string initialTunnelFrameExchange(TunnelFrameStream &stream, bool isClient)
 
 SocketProducerConsumer::SocketProducerConsumer(bool isClient, TunnelFramePipe &pipe)
     : _isClient(isClient) {
-    pipeTo(pipe);
+    pipeAttach(pipe);
+    BOOST_LOG_TRIVIAL(info) << "Socket producer/consumer started";
 }
 
 SocketProducerConsumer::~SocketProducerConsumer() {
-    for (auto &t : _receiveFromSocketThreads) {
+    for (auto &t : _threads) {
         t.join();
     }
 
-    unPipe();
+    pipeDetach();
+    BOOST_LOG_TRIVIAL(info) << "Socket producer/consumer finished";
 }
 
 void SocketProducerConsumer::addSocket(SocketConfig config) {
@@ -85,38 +102,78 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
 
     BOOST_LOG_TRIVIAL(info) << "Starting thread for socket file descriptor " << config.fd;
 
-    _receiveFromSocketThreads.emplace_back([this, config = std::move(config)]() mutable {
-        try {
-            _receiveFromSocketLoop(std::move(config));
+    std::lock_guard<std::mutex> lg(_mutex);
 
-            BOOST_LOG_TRIVIAL(info) << "Thread for socket " << config.fd
+    _streams.emplace_back(std::move(config.fd));
+    _threads.emplace_back([this, &stream = _streams.back()] {
+        BOOST_LOG_NAMED_SCOPE("_receiveFromSocketLoop");
+
+        try {
+            _receiveFromSocketLoop(stream);
+
+            BOOST_LOG_TRIVIAL(info) << "Thread for socket " << stream.desc()
                                     << " exited normally. This should never be reached.";
             BOOST_ASSERT(false);
         } catch (const std::exception &ex) {
             BOOST_LOG_TRIVIAL(info)
-                << "Thread for socket " << config.fd << " completed due to " << ex.what();
+                << "Thread for socket " << stream.desc() << " completed due to " << ex.what();
         }
     });
 }
 
 void SocketProducerConsumer::interrupt() {
-    // Interrupt the producer/consumer threads and join them
-    _receiveFromSocketTasksInterrupted.store(true);
+    // Interrupt the producer/consumer threads
+    _interrupted.store(true);
 }
 
-void SocketProducerConsumer::onTunnelFrameReady(TunnelFrameReader reader) {}
+void SocketProducerConsumer::onTunnelFrameReady(TunnelFrameBuffer buf) {
+    std::lock_guard<std::mutex> lg(_mutex);
 
-void SocketProducerConsumer::_receiveFromSocketLoop(SocketConfig config) {
-    TunnelFrameStream stream(std::move(config.fd));
-    BOOST_LOG_TRIVIAL(info) << "Initial exchange with "
-                            << initialTunnelFrameExchange(stream, _isClient) << " successful";
+    if (_streams.empty())
+        throw Exception("No client connected yet");
 
-    while (!_receiveFromSocketTasksInterrupted.load()) {
-        _pipe->onTunnelFrameReady(stream.receive());
+    // TODO: Choose a client/server connection to send it on based on some bandwidth requirements
+    // metric
+    _streams.front().send(buf);
+}
+
+void SocketProducerConsumer::_receiveFromSocketLoop(TunnelFrameStream &stream) {
+    auto ifr = initialTunnelFrameExchange(stream, _isClient);
+    BOOST_LOG_TRIVIAL(info) << "Initial exchange with " << ifr.identifier << ":" << ifr.sessionId
+                            << " successful";
+
+    while (!_interrupted.load()) {
+        pipeInvoke(stream.receive());
     }
 }
 
-SocketProducerConsumer::SocketConfig::SocketConfig(std::string name_, int fd_)
-    : name(std::move(name_)), fd(name, fd_) {}
+TunnelFrameStream::TunnelFrameStream(ScopedFileDescriptor fd) : _fd(std::move(fd)) {}
+
+TunnelFrameStream::~TunnelFrameStream() = default;
+
+void TunnelFrameStream::send(TunnelFrameBuffer buf) {
+    int numWritten = 0;
+    while (numWritten < buf.size) {
+        numWritten += _fd.write((void const *)buf.data, buf.size);
+    }
+
+    BOOST_LOG_TRIVIAL(debug) << "Written frame of " << numWritten << " bytes";
+}
+
+TunnelFrameBuffer TunnelFrameStream::receive() {
+    int numRead = _fd.read((void *)_buffer, sizeof(TunnelFrameHeader));
+
+    size_t totalSize = ((TunnelFrameHeader *)_buffer)->desc.size;
+    BOOST_LOG_TRIVIAL(debug) << "Received a header of a frame of size " << totalSize;
+
+    while (numRead < totalSize) {
+        numRead += read(_fd, (void *)&_buffer[numRead], totalSize - numRead);
+
+        BOOST_LOG_TRIVIAL(debug) << "Received " << numRead << " bytes so far";
+    }
+
+    BOOST_ASSERT(numRead == totalSize);
+    return {_buffer, totalSize};
+}
 
 } // namespace ruralpi

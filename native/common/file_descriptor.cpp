@@ -51,6 +51,18 @@ ScopedFileDescriptor::ScopedFileDescriptor(const std::string &desc, int fd)
     BOOST_LOG_TRIVIAL(debug) << boost::format("File descriptor created (%d): %s") % _fd % _desc;
 }
 
+ScopedFileDescriptor::ScopedFileDescriptor(ScopedFileDescriptor &&other) {
+    if (&other == this)
+        return;
+
+    BOOST_LOG_TRIVIAL(debug) << boost::format("File descriptor moved (%d): %s") % other._fd %
+                                    other._desc;
+
+    _desc = std::move(other._desc);
+    _fd = other._fd;
+    other._fd = -1;
+}
+
 ScopedFileDescriptor::~ScopedFileDescriptor() {
     if (_fd > 0) {
         BOOST_LOG_TRIVIAL(debug) << boost::format("File descriptor closed (%d): %s") % _fd % _desc;
@@ -68,18 +80,6 @@ ScopedFileDescriptor::~ScopedFileDescriptor() {
     BOOST_LOG_TRIVIAL(fatal) << boost::format("Illegal file descriptor (%d): %s") % _fd %
                                     _desc.c_str();
     BOOST_ASSERT(false);
-}
-
-ScopedFileDescriptor::ScopedFileDescriptor(ScopedFileDescriptor &&other) {
-    if (&other == this)
-        return;
-
-    BOOST_LOG_TRIVIAL(debug) << boost::format("File descriptor moved (%d): %s") % other._fd %
-                                    other._desc;
-
-    _desc = std::move(other._desc);
-    _fd = other._fd;
-    other._fd = -1;
 }
 
 } // namespace ruralpi

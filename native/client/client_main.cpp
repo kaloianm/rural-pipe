@@ -16,8 +16,8 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
-#include <arpa/inet.h>
 #include <boost/asio.hpp>
+#include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/trivial.hpp>
 #include <iostream>
 #include <sys/socket.h>
@@ -32,43 +32,55 @@ namespace ruralpi {
 namespace client {
 namespace {
 
+namespace asio = boost::asio;
+
+class Client {
+public:
+    Client(Context &ctx, SocketProducerConsumer &socketPC) : _socketPC(socketPC) {
+        _socketPC.addSocket(
+            SocketProducerConsumer::SocketConfig{_connectTo(ctx.serverHost, ctx.serverPort)});
+    }
+
+private:
+    static ScopedFileDescriptor _connectTo(const std::string &serverHost, int serverPort) {
+        sockaddr_in addr;
+
+        {
+            asio::io_service io_service;
+            asio::ip::tcp::resolver resolver(io_service);
+            asio::ip::tcp::resolver::query query(serverHost, std::to_string(serverPort));
+            asio::ip::tcp::resolver::iterator iter = resolver.resolve(query);
+            memcpy(&addr, iter->endpoint().data(), iter->endpoint().size());
+        }
+
+        auto addr_v4 = asio::ip::address_v4(ntohl(addr.sin_addr.s_addr));
+        BOOST_LOG_TRIVIAL(info) << "Connecting to " << addr_v4;
+
+        ScopedFileDescriptor sock(addr_v4.to_string(), ::socket(AF_INET, SOCK_STREAM, 0));
+        SYSCALL(::connect(sock, (struct sockaddr *)&addr, sizeof(addr)));
+
+        return std::move(sock);
+    }
+
+    SocketProducerConsumer &_socketPC;
+};
+
 void clientMain(Context &ctx) {
+    BOOST_LOG_NAMED_SCOPE("clientMain");
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe client starting with server " << ctx.serverHost << ':'
                             << ctx.serverPort << " and " << ctx.nqueues << " queues";
 
     // Create the client-side Tunnel device
     TunCtl tunnel("rpic", ctx.nqueues);
-    TunnelProducerConsumer tunnelPC(tunnel.getQueues());
+    TunnelProducerConsumer tunnelPC(tunnel.getQueues(), tunnel.getMTU());
     SocketProducerConsumer socketPC(true /* isClient */, tunnelPC);
-
-    // Connect to the server
-    {
-        struct sockaddr_in addr;
-        {
-            boost::asio::io_service io_service;
-            boost::asio::ip::tcp::resolver resolver(io_service);
-            boost::asio::ip::tcp::resolver::query query(ctx.serverHost,
-                                                        std::to_string(ctx.serverPort));
-            boost::asio::ip::tcp::resolver::iterator iter = resolver.resolve(query);
-            memcpy(&addr, iter->endpoint().data(), iter->endpoint().size());
-        }
-
-        auto addr_v4 = boost::asio::ip::address_v4(ntohl(addr.sin_addr.s_addr));
-        BOOST_LOG_TRIVIAL(info) << "Connecting to " << addr_v4;
-
-        SocketProducerConsumer::SocketConfig config(addr_v4.to_string(),
-                                                    socket(AF_INET, SOCK_STREAM, 0));
-
-        if (connect(config.fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
-            SystemException::throwFromErrno("Failed to connect to server");
-
-        socketPC.addSocket(std::move(config));
-    }
+    Client client(ctx, socketPC);
 
     std::cout << "Rural Pipe client running" << std::endl; // Indicates to the startup script that
                                                            // the tunnel device has been created and
                                                            // that it can configure the routing
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe client running";
+    ctx.waitForExit();
 }
 
 } // namespace

@@ -19,55 +19,85 @@
 #pragma once
 
 #include <atomic>
+#include <list>
 #include <mutex>
 #include <string>
 #include <thread>
-#include <vector>
 
 #include "common/file_descriptor.h"
 #include "common/tunnel_frame.h"
 
 namespace ruralpi {
 
+/**
+ * Blocking interface, which takes ownership of a socket file descriptor and sends and receives
+ * tunnel frames from it.
+ */
+class TunnelFrameStream {
+public:
+    // An established file descriptor, whose lifetime is owned by the tunnel frame stream after
+    // construction
+    TunnelFrameStream(ScopedFileDescriptor fd);
+    ~TunnelFrameStream();
+
+    /**
+     * Expects a buffer pointing to a closed tunnel frame writer. Takes its contents and sends them
+     * on the socket. Will block if the buffer of the socket is full.
+     */
+    void send(TunnelFrameBuffer buf);
+
+    /**
+     * Receives a tunnel frame from the socket. Will block if there is no data available from the
+     * socket yet.
+     */
+    TunnelFrameBuffer receive();
+
+    const auto &desc() const { return _fd.desc(); }
+
+private:
+    ScopedFileDescriptor _fd;
+
+    uint8_t _buffer[kTunnelFrameMaxSize];
+};
+
+/**
+ * Handles the communication between client and server on the front and passes tunnel frames through
+ * the pipe on the back.
+ */
 class SocketProducerConsumer : public TunnelFramePipe {
 public:
-    struct SocketConfig {
-        // Human-readable name of the socket configuration (e.g., "eth0", "ADSL connection", "Mobile
-        // connection")
-        std::string name;
-
-        // File descriptor of the socket
-        ScopedFileDescriptor fd;
-
-        SocketConfig(std::string name, int fd);
-    };
-
     SocketProducerConsumer(bool isClient, TunnelFramePipe &pipe);
     ~SocketProducerConsumer();
 
+    struct SocketConfig {
+        ScopedFileDescriptor fd;
+    };
     void addSocket(SocketConfig config);
 
     void interrupt();
 
 private:
     // TunnelFramePipe methods
-    void onTunnelFrameReady(TunnelFrameReader reader) override;
+    void onTunnelFrameReady(TunnelFrameBuffer buf) override;
 
     /**
      * Runs on a thread per socket file descriptor passed through call to `addSocket`. Receives
      * incoming tunnel frames and passes them on to the upstream tunnel producer/consumer.
      */
-    void _receiveFromSocketLoop(SocketConfig config);
+    void _receiveFromSocketLoop(TunnelFrameStream &stream);
 
     // Indicates whether this socket is run as a client or server
-    bool _isClient;
+    const bool _isClient;
 
     // Mutex to protect access to the state below
     std::mutex _mutex;
 
     // Associated with the `_receiveFromSocketLoop`
-    std::atomic<bool> _receiveFromSocketTasksInterrupted{false};
-    std::vector<std::thread> _receiveFromSocketThreads;
+    std::atomic<bool> _interrupted{false};
+
+    // Set of streams and associated threads to drain them
+    std::list<TunnelFrameStream> _streams;
+    std::list<std::thread> _threads;
 };
 
 } // namespace ruralpi

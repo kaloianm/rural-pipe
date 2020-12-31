@@ -20,6 +20,7 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
+#include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
@@ -72,11 +73,12 @@ ContextBase::ShouldStart ContextBase::start(int argc, const char *argv[],
                           logging::keywords::time_based_rotation =
                               logging::sinks::file::rotation_at_time_point(0, 0, 0),
                           logging::keywords::auto_flush = true,
-                          logging::keywords::format = "[%TimeStamp%]: %Message%");
+                          logging::keywords::format = "[%TimeStamp% (%Scope%)]: %Message%");
 
     logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
 
     logging::add_common_attributes();
+    logging::core::get()->add_global_attribute("Scope", boost::log::attributes::named_scope());
 
     // Instantiate the commands server so that the controlling script can start polling for startup
     // state information

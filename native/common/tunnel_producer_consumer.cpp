@@ -18,9 +18,11 @@
 
 #include "common/tunnel_producer_consumer.h"
 
+#include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/trivial.hpp>
 #include <chrono>
 #include <poll.h>
+#include <sys/ioctl.h>
 
 #include "common/exception.h"
 #include "common/ip_parsers.h"
@@ -52,11 +54,9 @@ void debugLogDatagram(uint8_t const *data, size_t size) {
 
 } // namespace
 
-TunnelProducerConsumer::TunnelProducerConsumer(std::vector<FileDescriptor> tunnelFds)
-    : _tunnelFds(std::move(tunnelFds)) {
-    for (int i = 0; i < _tunnelFds.size(); i++) {
-        auto fd = _tunnelFds[i];
-
+TunnelProducerConsumer::TunnelProducerConsumer(std::vector<FileDescriptor> tunnelFds, int mtu)
+    : _tunnelFds(std::move(tunnelFds)), _mtu(mtu) {
+    for (auto &fd : _tunnelFds) {
         const bool isSocket = [&] {
             struct stat s;
             SYSCALL(fstat(fd, &s));
@@ -68,33 +68,42 @@ TunnelProducerConsumer::TunnelProducerConsumer(std::vector<FileDescriptor> tunne
 
         BOOST_LOG_TRIVIAL(info) << "Starting thread for tunnel file descriptor " << fd;
 
-        _receiveFromTunnelThreads.emplace_back([this, fd = std::move(fd)] {
+        std::lock_guard<std::mutex> lg(_mutex);
+
+        _threads.emplace_back([this, &fd] {
+            BOOST_LOG_NAMED_SCOPE("_receiveFromTunnelLoop");
+
             try {
                 _receiveFromTunnelLoop(fd);
 
-                BOOST_LOG_TRIVIAL(fatal) << "Thread for socket " << fd
-                                         << " exited normally. This should never be reached.";
+                BOOST_LOG_TRIVIAL(info) << "Thread for tunnel device " << fd.desc()
+                                        << " exited normally. This should never be reached.";
                 BOOST_ASSERT(false);
             } catch (const std::exception &ex) {
-                BOOST_LOG_TRIVIAL(info)
-                    << "Thread for socket " << fd << " completed due to " << ex.what();
+                BOOST_LOG_TRIVIAL(info) << "Thread for tunnel device " << fd.desc()
+                                        << " completed due to " << ex.what();
             }
         });
     }
+
+    BOOST_LOG_TRIVIAL(info) << "Tunnel producer/consumer started";
 }
 
 TunnelProducerConsumer::~TunnelProducerConsumer() {
-    for (auto &t : _receiveFromTunnelThreads) {
+    for (auto &t : _threads) {
         t.join();
     }
+
+    BOOST_LOG_TRIVIAL(info) << "Tunnel producer/consumer finished";
 }
 
 void TunnelProducerConsumer::interrupt() {
     // Interrupt the producer/consumer threads and join them
-    _receiveFromTunnelTasksInterrupted.store(true);
+    _interrupted.store(true);
 }
 
-void TunnelProducerConsumer::onTunnelFrameReady(TunnelFrameReader reader) {
+void TunnelProducerConsumer::onTunnelFrameReady(TunnelFrameBuffer buf) {
+    TunnelFrameReader reader(buf);
     while (reader.next()) {
         debugLogDatagram(reader.data(), reader.size());
 
@@ -106,11 +115,16 @@ void TunnelProducerConsumer::onTunnelFrameReady(TunnelFrameReader reader) {
     }
 }
 
-void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor tunnelFd) {
+void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
     uint8_t buffer[kTunnelFrameMaxSize];
+    uint8_t *mtu = (uint8_t *)alloca(_mtu);
+    int mtuBufferSize = 0;
+
+    memset(buffer, 0xAA, sizeof(buffer));
+    memset(mtu, 0xBB, _mtu);
 
     while (true) {
-        TunnelFrameWriter writer(buffer, kTunnelFrameMaxSize);
+        TunnelFrameWriter writer({buffer, kTunnelFrameMaxSize});
 
         // Receive datagrams from the tunnel devices and write them to the frame until it is full
         int numDatagramsWritten = 0;
@@ -118,8 +132,13 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor tunnelFd) {
             // Wait for the next datagram to arrive
             int res;
             while (true) {
-                if (_receiveFromTunnelTasksInterrupted.load()) {
+                if (_interrupted.load()) {
                     throw Exception("Interrupted");
+                }
+
+                if (mtuBufferSize) {
+                    res = 1;
+                    break;
                 }
 
                 BOOST_LOG_TRIVIAL(debug)
@@ -139,34 +158,39 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor tunnelFd) {
                     break;
             }
 
+            // Nothing was received for some time, see whether we managed to batch some frames in
+            // the buffer, in which case they should be sent
             if (res == 0) {
-                assert(numDatagramsWritten);
+                BOOST_ASSERT(numDatagramsWritten);
                 break;
             }
 
-            // Check how much is the size of the next incoming datagram
-            int nextDatagramSize;
-            SYSCALL_MSG(ioctl(tunnelFd, FIONREAD, &nextDatagramSize),
-                        "Error while checking the next datagram size");
+            BOOST_ASSERT(res == 1);
 
-            if (nextDatagramSize > writer.remainingBytes()) {
-                assert(numDatagramsWritten);
+            // Read the incoming datagram in the MTU buffer
+            if (!mtuBufferSize) {
+                mtuBufferSize = tunnelFd.read(mtu, _mtu);
+                BOOST_LOG_TRIVIAL(debug)
+                    << "Received " << mtuBufferSize << " bytes from tunnel socket " << tunnelFd;
+            }
+
+            if (mtuBufferSize > writer.remainingBytes()) {
+                BOOST_ASSERT(numDatagramsWritten);
                 break;
             }
 
-            // Read the incoming datagram in the frame
-            int nRead = tunnelFd.read((void *)writer.data(), writer.remainingBytes());
-            BOOST_LOG_TRIVIAL(debug)
-                << "Received " << nRead << " bytes from tunnel socket " << tunnelFd;
-
-            debugLogDatagram(writer.data(), nRead);
-            writer.onDatagramWritten(nRead);
+            memcpy(writer.data(), mtu, mtuBufferSize);
+            debugLogDatagram(writer.data(), mtuBufferSize);
+            writer.onDatagramWritten(mtuBufferSize);
+            mtuBufferSize = 0;
 
             ++numDatagramsWritten;
         }
 
-        writer.close(_seqNum.fetch_add(1));
-        _pipe->onTunnelFrameReady(TunnelFrameReader(writer.begin(), writer.totalSize()));
+        writer.header().seqNum = _seqNum.fetch_add(1);
+        writer.close();
+
+        pipeInvoke(writer.buffer());
     }
 }
 

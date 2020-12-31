@@ -20,6 +20,7 @@
 
 #include <array>
 #include <boost/uuid/uuid.hpp>
+#include <mutex>
 
 namespace ruralpi {
 
@@ -36,7 +37,10 @@ struct TunnelFrameHeader {
         uint16_t flags : 2;
         uint16_t size : 12;
     } desc;
+
     char signature[128];
+
+    // The signature covers all fields and data which follow from that point onwards
     boost::uuids::uuid sessionId;
     uint64_t seqNum;
 };
@@ -53,17 +57,27 @@ struct InitTunnelFrame {
 };
 #pragma pack(pop)
 
+struct ConstTunnelFrameBuffer {
+    uint8_t const *data;
+    size_t size;
+};
+
+struct TunnelFrameBuffer {
+    uint8_t *data;
+    size_t size;
+};
+
 class TunnelFrameReader {
 public:
-    TunnelFrameReader(uint8_t const *data, size_t size);
+    TunnelFrameReader(const ConstTunnelFrameBuffer &buf);
+    TunnelFrameReader(const TunnelFrameBuffer &buf);
 
     /**
      * Provides direct access to the header of the frame and is available at any time, regardless of
      * whether the current pointer of the reader is located or whether there are any datagrams.
      */
     const TunnelFrameHeader &header() const { return *((TunnelFrameHeader *)_begin); }
-    uint8_t const *begin() const { return _begin; }
-    size_t totalSize() const { return header().desc.size; }
+    ConstTunnelFrameBuffer buffer() const { return {_begin, header().desc.size}; }
 
     /**
      * Must be called at least once to position the pointer at the first datagram in the frame. The
@@ -82,7 +96,14 @@ private:
 
 class TunnelFrameWriter {
 public:
-    TunnelFrameWriter(uint8_t *data, size_t size);
+    TunnelFrameWriter(const TunnelFrameBuffer &buf);
+
+    /**
+     * Provides direct access to the header of the frame and is available at any time, regardless of
+     * whether the current pointer of the reader is located or whether there are any datagrams.
+     */
+    TunnelFrameHeader &header() const { return *((TunnelFrameHeader *)_begin); }
+    TunnelFrameBuffer buffer() const { return {_begin, header().desc.size}; }
 
     /**
      * Returns a pointer to a block of memory of maximum size `remainingBytes()` where the next
@@ -105,9 +126,7 @@ public:
      * Must be invoked when no more datagrams will be written to that tunnel frame. It will update
      * the header of the frame and return the actual number of bytes which it contains.
      */
-    void close(uint64_t seqNum);
-    uint8_t const *begin() const { return _begin; }
-    size_t totalSize() const { return _current - _begin - 1; }
+    void close();
 
     /**
      * These methods are here just to facilitate the writing of unit-tests and should not be used in
@@ -133,18 +152,25 @@ public:
      * multiple threads at a time and it is up to the implementer to provide internal
      * synchronisation if it is required.
      *
-     * The method is allowed to block if the upstream called is unable to process the frame
-     * immediately.
+     * The implementation is allowed to modify the passed-in buffer, but must not store any pointers
+     * to any of its contents.
+     *
+     * The method must not block if the upstream called is unable to process the stream immediately.
      */
-    virtual void onTunnelFrameReady(TunnelFrameReader reader) = 0;
+    virtual void onTunnelFrameReady(TunnelFrameBuffer buf) = 0;
 
-    void pipeTo(TunnelFramePipe &pipe);
-    void unPipe();
+    void pipeInvoke(TunnelFrameBuffer buf);
 
 protected:
     TunnelFramePipe();
+    TunnelFramePipe(TunnelFramePipe *pipe);
 
-    TunnelFramePipe *_pipe{nullptr};
+    void pipeAttach(TunnelFramePipe &pipe);
+    void pipeDetach();
+
+private:
+    std::mutex _mutex;
+    TunnelFramePipe *_pipe;
 };
 
 } // namespace ruralpi

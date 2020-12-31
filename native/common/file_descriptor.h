@@ -32,6 +32,7 @@ public:
     int read(void *buf, size_t nbytes);
     int write(void const *buf, size_t size);
 
+    const auto &desc() const { return _desc; }
     operator int() const { return _fd; }
 
 protected:
@@ -45,9 +46,9 @@ protected:
 class ScopedFileDescriptor : public FileDescriptor {
 public:
     ScopedFileDescriptor(const std::string &desc, int fd);
-    ~ScopedFileDescriptor();
 
     ScopedFileDescriptor(ScopedFileDescriptor &&);
+    ~ScopedFileDescriptor();
 };
 
 } // namespace ruralpi

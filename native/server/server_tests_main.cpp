@@ -17,24 +17,26 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #include <boost/filesystem.hpp>
+#include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/log/utility/setup/console.hpp>
 #include <mutex>
 
 #include "common/exception.h"
-#include "common/file_descriptor.h"
 #include "common/socket_producer_consumer.h"
-#include "common/tunnel_frame.h"
-#include "common/tunnel_frame_stream.h"
 #include "common/tunnel_producer_consumer.h"
 
 namespace ruralpi {
 namespace server {
 namespace {
 
+namespace logging = boost::log;
 namespace fs = boost::filesystem;
 
 #define LOG BOOST_LOG_TRIVIAL(info)
 #define DATA_AND_SIZE(x) x, sizeof(x) + 1
+#define CHECK(x) BOOST_ASSERT(x)
 
 struct TestFifo {
     ScopedFileDescriptor fd;
@@ -51,24 +53,27 @@ struct TestFifo {
 
 void tunnelFrameTests() {
     uint8_t buffer[kTunnelFrameMaxSize];
+    memset(buffer, 0xAA, sizeof(buffer));
 
-    TunnelFrameWriter writer(buffer, kTunnelFrameMaxSize);
+    TunnelFrameWriter writer({buffer, kTunnelFrameMaxSize});
     LOG << writer.remainingBytes();
     writer.appendString("DG1");
     LOG << writer.remainingBytes();
     writer.appendString("DG2");
     LOG << writer.remainingBytes();
-    writer.close(0);
-    assert(writer.totalSize() > 0);
-    LOG << writer.totalSize();
+    writer.header().seqNum = 0;
+    writer.close();
+    CHECK(writer.buffer().size > 0);
+    LOG << writer.buffer().size;
+    CHECK(writer.buffer().data[writer.buffer().size] == 0xAA);
 
-    TunnelFrameReader reader(buffer, kTunnelFrameMaxSize);
-    assert(reader.header().seqNum == 0);
-    assert(reader.next());
+    TunnelFrameReader reader(ConstTunnelFrameBuffer{buffer, kTunnelFrameMaxSize});
+    CHECK(reader.header().seqNum == 0);
+    CHECK(reader.next());
     LOG << (char *)reader.data();
-    assert(reader.next());
+    CHECK(reader.next());
     LOG << (char *)reader.data();
-    assert(!reader.next());
+    CHECK(!reader.next());
 }
 
 void tunnelFrameStreamTests() {
@@ -84,60 +89,63 @@ void tunnelFrameStreamTests() {
     // Send/receive
     {
         stream.send([&] {
-            TunnelFrameWriter writer(buffer, sizeof(buffer));
+            TunnelFrameWriter writer({buffer, sizeof(buffer)});
             writer.appendString("DG1");
-            writer.close(0);
-            return writer;
+            writer.close();
+            return writer.buffer();
         }());
 
-        auto reader = stream.receive();
-        assert(reader.header().seqNum == 0);
-        assert(reader.next());
+        TunnelFrameReader reader(stream.receive());
+        CHECK(reader.header().seqNum == 0);
+        CHECK(reader.next());
         LOG << (char *)reader.data();
-        assert(!reader.next());
+        CHECK(!reader.next());
     }
 
     // Send/receive of a partial frame
     {
-        TunnelFrameWriter writer(buffer, sizeof(buffer));
+        TunnelFrameWriter writer({buffer, sizeof(buffer)});
         for (int i = 0; i < 10; i++) {
             writer.appendString("Longer datagram content; Longer datagram content; Longer datagram "
                                 "content; Longer datagram content; Longer datagram content; Longer "
                                 "datagram content");
         }
-        writer.close(0);
-        LOG << "Size " << writer.totalSize();
-        assert(write(fd, writer.begin(), 100) == 100);
-        assert(write(fd, writer.begin() + 100, writer.totalSize() - 100) ==
-               writer.totalSize() - 100);
-        auto reader = stream.receive();
-        assert(reader.header().seqNum == 0);
+        writer.close();
+        LOG << "Size " << writer.buffer().size;
+        CHECK(write(fd, writer.buffer().data, 100) == 100);
+        CHECK(write(fd, writer.buffer().data + 100, writer.buffer().size - 100) ==
+              writer.buffer().size - 100);
+        TunnelFrameReader reader(stream.receive());
+        CHECK(reader.header().seqNum == 0);
         for (int i = 0; i < 10; i++) {
-            assert(reader.next());
+            CHECK(reader.next());
             LOG << (char *)reader.data();
         }
-        assert(!reader.next());
+        CHECK(!reader.next());
     }
 }
 
 void tunnelProducerConsumerTests() {
     TestFifo pipes[2];
-    TunnelProducerConsumer tunnelPC(std::vector<FileDescriptor>{pipes[0].fd, pipes[1].fd});
+    TunnelProducerConsumer tunnelPC(std::vector<FileDescriptor>{pipes[0].fd, pipes[1].fd}, 1500);
 
     struct TestPipe : public TunnelFramePipe {
-        TestPipe(TunnelFramePipe &pipe) { pipeTo(pipe); }
-        ~TestPipe() { unPipe(); }
+        TestPipe(TunnelFramePipe &pipe) { pipeAttach(pipe); }
+        ~TestPipe() { pipeDetach(); }
 
-        void onTunnelFrameReady(TunnelFrameReader reader) override {
-            LOG << "Received a frame of " << reader.totalSize() << " bytes";
+        void onTunnelFrameReady(TunnelFrameBuffer buf) override {
+            LOG << "Received tunnel frame of " << buf.size << " bytes";
 
             std::lock_guard<std::mutex> lg(mutex);
+            memcpy(lastFrameReceived, buf.data, buf.size);
+            lastFrameReceivedSize = buf.size;
             ++numFramesReceived;
-            memcpy(lastFrameReceived, reader.begin(), reader.totalSize());
-            lastFrameReceivedSize = reader.totalSize();
         }
 
-        void sendFrameBack(TunnelFrameReader reader) { _pipe->onTunnelFrameReady(reader); }
+        int getNumFramesReceived() {
+            std::lock_guard<std::mutex> lg(mutex);
+            return numFramesReceived;
+        }
 
         std::mutex mutex;
         int numFramesReceived{0};
@@ -146,21 +154,21 @@ void tunnelProducerConsumerTests() {
     } testPipe(tunnelPC);
 
     LOG << "Sending datagrams on file descriptors " << pipes[0].fd << " " << pipes[1].fd;
-    assert(write(pipes[0].fd, DATA_AND_SIZE("DG1.1")) > 0);
-    assert(write(pipes[1].fd, DATA_AND_SIZE("DG2.1")) > 0);
+    CHECK(write(pipes[0].fd, DATA_AND_SIZE("DG1.1")) > 0);
+    CHECK(write(pipes[1].fd, DATA_AND_SIZE("DG2.1")) > 0);
 
-    while (testPipe.numFramesReceived < 2)
+    while (testPipe.getNumFramesReceived() < 2)
         sleep(1);
 
     LOG << "Parsing the last received tunnel frame";
 
-    TunnelFrameReader reader(testPipe.lastFrameReceived, testPipe.lastFrameReceivedSize);
-    assert(reader.next());
+    TunnelFrameReader reader(
+        ConstTunnelFrameBuffer{testPipe.lastFrameReceived, testPipe.lastFrameReceivedSize});
+    CHECK(reader.next());
     LOG << (char *)reader.data();
-    assert(!reader.next());
+    CHECK(!reader.next());
 
-    testPipe.sendFrameBack(
-        TunnelFrameReader(testPipe.lastFrameReceived, testPipe.lastFrameReceivedSize));
+    testPipe.pipeInvoke({testPipe.lastFrameReceived, testPipe.lastFrameReceivedSize});
 
     tunnelPC.interrupt();
 }
@@ -169,7 +177,7 @@ void socketProducerConsumerTests() {
     TestFifo pipes[2];
 
     struct TestPipe : public TunnelFramePipe {
-        void onTunnelFrameReady(TunnelFrameReader reader) override {}
+        void onTunnelFrameReady(TunnelFrameBuffer buf) override {}
     } testPipe;
 
     SocketProducerConsumer socketPC(true /* isClient */, testPipe);
@@ -178,17 +186,34 @@ void socketProducerConsumerTests() {
 }
 
 void serverTestsMain() {
-    BOOST_LOG_TRIVIAL(info) << "Running TunnelFrame tests ...";
-    tunnelFrameTests();
+    logging::add_console_log(std::cout,
+                             boost::log::keywords::format = "[%ThreadID% (%Scope%)] %Message%");
+    logging::add_common_attributes();
+    logging::core::get()->add_global_attribute("Scope", boost::log::attributes::named_scope());
 
-    BOOST_LOG_TRIVIAL(info) << "Running TunnelFrameStream tests ...";
-    tunnelFrameStreamTests();
+    {
+        BOOST_LOG_NAMED_SCOPE("tunnelFrameTests");
+        BOOST_LOG_TRIVIAL(info) << "Running tunnelFrameTests ...";
+        tunnelFrameTests();
+    }
 
-    BOOST_LOG_TRIVIAL(info) << "Running TunnelProducerConsumer tests ...";
-    tunnelProducerConsumerTests();
+    {
+        BOOST_LOG_NAMED_SCOPE("tunnelFrameTests");
+        BOOST_LOG_TRIVIAL(info) << "Running tunnelFrameTests ...";
+        tunnelFrameStreamTests();
+    }
 
-    BOOST_LOG_TRIVIAL(info) << "Running SocketProducerConsumer tests ...";
-    socketProducerConsumerTests();
+    {
+        BOOST_LOG_NAMED_SCOPE("tunnelProducerConsumerTests");
+        BOOST_LOG_TRIVIAL(info) << "Running tunnelProducerConsumerTests ...";
+        tunnelProducerConsumerTests();
+    }
+
+    {
+        BOOST_LOG_NAMED_SCOPE("socketProducerConsumerTests");
+        BOOST_LOG_TRIVIAL(info) << "Running socketProducerConsumerTests ...";
+        socketProducerConsumerTests();
+    }
 }
 
 } // namespace

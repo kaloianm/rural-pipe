@@ -28,26 +28,35 @@
 
 namespace ruralpi {
 
+/**
+ * Handles the datagram communication with the tunnel device on the front and exchanges tunnel
+ * frames through the pipe on the back.
+ */
 class TunnelProducerConsumer : public TunnelFramePipe {
 public:
-    TunnelProducerConsumer(std::vector<FileDescriptor> tunnelFds);
+    TunnelProducerConsumer(std::vector<FileDescriptor> tunnelFds, int mtu);
     ~TunnelProducerConsumer();
 
     void interrupt();
 
 private:
     // TunnelFramePipe methods
-    void onTunnelFrameReady(TunnelFrameReader reader) override;
+    void onTunnelFrameReady(TunnelFrameBuffer buf) override;
 
     /**
      * One of these functions runs on a separate thread per tunnel file descriptor (from
-     * `_tunnelFds`). They receive incoming datagrams, pack them into TunneFrame(s) and passes them
+     * `_tunnelFds`). They receive incoming datagrams, pack them into TunneFrame(s) and pass them
      * downwstream to the pipe attached to via 'TunnelFramePipe::pipeTo'.
      */
-    void _receiveFromTunnelLoop(FileDescriptor tunnelFd);
+    void _receiveFromTunnelLoop(FileDescriptor &tunnelFd);
 
-    // Vector with the Tunnel device's file descriptors
+    // Set of file descriptor provided a construction time, corresponding to the queues of the
+    // tunnel device
     std::vector<FileDescriptor> _tunnelFds;
+    int _mtu;
+
+    // Set of threads draining the file descriptors from `_tunnelFds`
+    std::vector<std::thread> _threads;
 
     // Serves as a source for sequencing the tunnel frames
     std::atomic<uint64_t> _seqNum{0};
@@ -56,8 +65,7 @@ private:
     std::mutex _mutex;
 
     // Associated with the `_receiveFromTunnelLoop` method
-    std::atomic<bool> _receiveFromTunnelTasksInterrupted{false};
-    std::vector<std::thread> _receiveFromTunnelThreads;
+    std::atomic<bool> _interrupted{false};
 };
 
 } // namespace ruralpi

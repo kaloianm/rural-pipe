@@ -18,8 +18,10 @@
 
 #include "common/tun_ctl.h"
 
+#include <boost/log/trivial.hpp>
 #include <linux/if.h>
 #include <linux/if_tun.h>
+#include <netinet/ip.h>
 #include <string.h>
 #include <sys/ioctl.h>
 
@@ -28,25 +30,38 @@
 namespace ruralpi {
 namespace {
 
-const char kDeviceName[] = "RPI";
 const char kSystemTunnelDevice[] = "/dev/net/tun";
 
 } // namespace
 
 TunCtl::TunCtl(std::string deviceName, int numQueues) : _deviceName(std::move(deviceName)) {
-    ifreq ifr;
+    if (deviceName.length() >= IFNAMSIZ)
+        throw Exception(boost::format("Device name %s is too long") % deviceName);
+
+    struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
+    strcpy(ifr.ifr_name, _deviceName.c_str());
 
     // Flags:   IFF_TUN   - TUN device (no Ethernet headers)
     //          IFF_NO_PI - Do not provide packet information
     //          IFF_MULTI_QUEUE - Create a queue of multiqueue device
     ifr.ifr_flags = IFF_TUN | IFF_NO_PI | IFF_MULTI_QUEUE;
-    strcpy(ifr.ifr_name, _deviceName.c_str());
 
     for (int i = 0; i < numQueues; i++) {
-        _fds.emplace_back(kSystemTunnelDevice, open(kSystemTunnelDevice, O_RDWR));
-        SYSCALL_MSG(ioctl(_fds[i], TUNSETIFF, (void *)&ifr), "Error configuring tunnel device");
+        _fds.emplace_back(kSystemTunnelDevice, ::open(kSystemTunnelDevice, O_RDWR));
+        SYSCALL_MSG(::ioctl(_fds[i], TUNSETIFF, (void *)&ifr), "Error configuring tunnel device");
     }
+
+    BOOST_LOG_TRIVIAL(info) << "Created tunnel device " << _deviceName << " with MTU " << getMTU();
+}
+
+size_t TunCtl::getMTU() {
+    ScopedFileDescriptor sock("MTU check socket", ::socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
+    struct ifreq ifr;
+    memset(&ifr, 0, sizeof(ifr));
+    strcpy(ifr.ifr_name, _deviceName.c_str());
+    SYSCALL(::ioctl(sock, SIOCGIFMTU, (void *)&ifr));
+    return size_t(ifr.ifr_mtu);
 }
 
 std::vector<FileDescriptor> TunCtl::getQueues() const {

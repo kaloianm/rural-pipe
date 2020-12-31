@@ -36,6 +36,11 @@ public:
     TunCtl(std::string deviceName, int numQueues);
 
     /**
+     * Returns the MTU of the tunnel device.
+     */
+    size_t getMTU();
+
+    /**
      * Returns the set of file descriptors mapped to this tunnel device's queues.
      */
     std::vector<FileDescriptor> getQueues() const;

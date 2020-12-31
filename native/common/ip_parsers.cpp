@@ -18,7 +18,6 @@
 
 #include "common/ip_parsers.h"
 
-#include <arpa/inet.h>
 #include <sstream>
 
 namespace ruralpi {

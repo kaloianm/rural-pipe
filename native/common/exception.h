@@ -40,6 +40,11 @@ class SystemException : public Exception {
 public:
     using Exception::Exception;
 
+    /**
+     * These `throwXXX` methods may only be called after a system call has returned an error (< 0)
+     * return code. They will take the `errno` from the syscall and produce a SystemException with
+     * an appropriate message.
+     */
     static void throwFromErrno(const std::string &context);
     static void throwFromErrno(const boost::format &context);
     static void throwFromErrno();
@@ -59,5 +64,16 @@ public:
     }()
 
 #define SYSCALL(x) SYSCALL_MSG(x, #x)
+
+class ScopedGuard {
+public:
+    ScopedGuard(std::function<void()> fn) : _fn(std::move(fn)) {}
+    ~ScopedGuard();
+
+    ScopedGuard(ScopedGuard &&);
+
+private:
+    std::function<void()> _fn;
+};
 
 } // namespace ruralpi
