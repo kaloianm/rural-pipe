@@ -49,6 +49,7 @@ void debugLogDatagram(uint8_t const *data, size_t size) {
         break;
     case SSCOPMCE::kProtoNum:
         BOOST_LOG_TRIVIAL(debug) << "SSCOPMCE: " << ip.toString() << ip.as<SSCOPMCE>().toString();
+        break;
     default:
         BOOST_LOG_TRIVIAL(warning) << "UNKNOWN: " << ip.toString();
         break;
@@ -194,8 +195,9 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
             try {
                 pipeInvoke(writer.buffer());
                 break;
-            } catch (const NotYetReadyException &) {
-                BOOST_LOG_TRIVIAL(debug) << "Not yet ready, retrying ...";
+            } catch (const NotYetReadyException &ex) {
+                BOOST_LOG_TRIVIAL(debug)
+                    << "Client/server not yet ready: " << ex.what() << "; retrying ...";
                 sleep(1);
             }
         }
