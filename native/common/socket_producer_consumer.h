@@ -74,8 +74,6 @@ public:
     };
     void addSocket(SocketConfig config);
 
-    void interrupt();
-
 private:
     // TunnelFramePipe methods
     void onTunnelFrameReady(TunnelFrameBuffer buf) override;

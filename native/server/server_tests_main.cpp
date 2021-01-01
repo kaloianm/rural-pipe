@@ -169,8 +169,6 @@ void tunnelProducerConsumerTests() {
     CHECK(!reader.next());
 
     testPipe.pipeInvoke({testPipe.lastFrameReceived, testPipe.lastFrameReceivedSize});
-
-    tunnelPC.interrupt();
 }
 
 void socketProducerConsumerTests() {
@@ -181,8 +179,6 @@ void socketProducerConsumerTests() {
     } testPipe;
 
     SocketProducerConsumer socketPC(true /* isClient */, testPipe);
-
-    socketPC.interrupt();
 }
 
 void serverTestsMain() {

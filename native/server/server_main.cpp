@@ -37,16 +37,24 @@ namespace asio = boost::asio;
 class Server {
 public:
     Server(Context &ctx, SocketProducerConsumer &socketPC)
-        : _socketPC(socketPC),
+        : _ctx(ctx), _socketPC(socketPC),
           _serverSock("Server main socket", ::socket(AF_INET, SOCK_STREAM, 0)) {
-        sockaddr_in addr;
+        struct sockaddr_in addr;
         addr.sin_family = AF_INET;
         addr.sin_addr.s_addr = INADDR_ANY;
         addr.sin_port = htons(ctx.port);
 
         SYSCALL(::bind(_serverSock, (sockaddr *)&addr, sizeof(addr)));
 
-        _thread = std::thread([this] { _acceptConnection(); });
+        _thread = std::thread([this] {
+            BOOST_LOG_NAMED_SCOPE("serverControl");
+            try {
+                _acceptConnection();
+            } catch (const std::exception &ex) {
+                BOOST_LOG_TRIVIAL(fatal) << "Server exited with error: " << ex.what();
+                _ctx.exit(1);
+            }
+        });
     }
 
     ~Server() {
@@ -61,7 +69,7 @@ private:
         while (true) {
             SYSCALL(::listen(_serverSock, 1));
 
-            sockaddr_in addr;
+            struct sockaddr_in addr;
             int addrlen;
             int clientSocket =
                 ::accept(_serverSock, (struct sockaddr *)&addr, (socklen_t *)&addrlen);
@@ -78,8 +86,11 @@ private:
         }
     }
 
+    Context &_ctx;
     SocketProducerConsumer &_socketPC;
+
     ScopedFileDescriptor _serverSock;
+
     std::thread _thread;
 };
 

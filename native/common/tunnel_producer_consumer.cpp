@@ -93,16 +93,13 @@ TunnelProducerConsumer::TunnelProducerConsumer(std::vector<FileDescriptor> tunne
 }
 
 TunnelProducerConsumer::~TunnelProducerConsumer() {
+    _interrupted.store(true);
+
     for (auto &t : _threads) {
         t.join();
     }
 
     BOOST_LOG_TRIVIAL(info) << "Tunnel producer/consumer finished";
-}
-
-void TunnelProducerConsumer::interrupt() {
-    // Interrupt the producer/consumer threads and join them
-    _interrupted.store(true);
 }
 
 void TunnelProducerConsumer::onTunnelFrameReady(TunnelFrameBuffer buf) {

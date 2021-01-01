@@ -36,33 +36,58 @@ namespace asio = boost::asio;
 
 class Client {
 public:
-    Client(Context &ctx, SocketProducerConsumer &socketPC) : _socketPC(socketPC) {
-        _socketPC.addSocket(
-            SocketProducerConsumer::SocketConfig{_connectTo(ctx.serverHost, ctx.serverPort)});
+    Client(Context &ctx, SocketProducerConsumer &socketPC)
+        : _ctx(ctx), _socketPC(socketPC), _serverAddr([&ctx = _ctx] {
+              struct sockaddr_in serverAddr;
+              asio::io_service io_service;
+              asio::ip::tcp::resolver resolver(io_service);
+              asio::ip::tcp::resolver::query query(ctx.serverHost, std::to_string(ctx.serverPort));
+              asio::ip::tcp::resolver::iterator iter = resolver.resolve(query);
+              memcpy(&serverAddr, iter->endpoint().data(), iter->endpoint().size());
+
+              return serverAddr;
+          }()) {
+
+        BOOST_LOG_TRIVIAL(info) << "Server " << ctx.serverHost << ":" << ctx.serverPort
+                                << " resolves to "
+                                << asio::ip::address_v4(ntohl(_serverAddr.sin_addr.s_addr)) << ":"
+                                << htons(_serverAddr.sin_port);
+
+        _thread = std::thread([this] {
+            BOOST_LOG_NAMED_SCOPE("clientControl");
+            try {
+                _socketPC.addSocket(
+                    SocketProducerConsumer::SocketConfig{_connectToServer("enp0s5")});
+                _ctx.waitForExit();
+            } catch (const std::exception &ex) {
+                BOOST_LOG_TRIVIAL(fatal) << "Client exited with error: " << ex.what();
+                _ctx.exit(1);
+            }
+        });
+    }
+
+    ~Client() {
+        if (_thread.joinable())
+            _thread.join();
+
+        BOOST_LOG_TRIVIAL(info) << "Client completed";
     }
 
 private:
-    static ScopedFileDescriptor _connectTo(const std::string &serverHost, int serverPort) {
-        sockaddr_in addr;
-
-        {
-            asio::io_service io_service;
-            asio::ip::tcp::resolver resolver(io_service);
-            asio::ip::tcp::resolver::query query(serverHost, std::to_string(serverPort));
-            asio::ip::tcp::resolver::iterator iter = resolver.resolve(query);
-            memcpy(&addr, iter->endpoint().data(), iter->endpoint().size());
-        }
-
-        auto addr_v4 = asio::ip::address_v4(ntohl(addr.sin_addr.s_addr));
-        BOOST_LOG_TRIVIAL(info) << "Connecting to " << addr_v4;
-
-        ScopedFileDescriptor sock(addr_v4.to_string(), ::socket(AF_INET, SOCK_STREAM, 0));
-        SYSCALL(::connect(sock, (struct sockaddr *)&addr, sizeof(addr)));
+    ScopedFileDescriptor _connectToServer(const std::string &interface) {
+        ScopedFileDescriptor sock(interface, ::socket(AF_INET, SOCK_STREAM, 0));
+        SYSCALL(::connect(sock, (struct sockaddr *)&_serverAddr, sizeof(_serverAddr)));
 
         return std::move(sock);
     }
 
+    Context &_ctx;
     SocketProducerConsumer &_socketPC;
+
+    // Resolved server address
+    const struct sockaddr_in _serverAddr;
+
+    std::thread _thread;
 };
 
 void clientMain(Context &ctx) {

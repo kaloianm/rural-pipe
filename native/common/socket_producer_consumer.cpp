@@ -82,6 +82,8 @@ SocketProducerConsumer::SocketProducerConsumer(bool isClient, TunnelFramePipe &p
 }
 
 SocketProducerConsumer::~SocketProducerConsumer() {
+    _interrupted.store(true);
+
     for (auto &t : _threads) {
         t.join();
     }
@@ -119,11 +121,6 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
                 << "Thread for socket " << stream.desc() << " completed due to " << ex.what();
         }
     });
-}
-
-void SocketProducerConsumer::interrupt() {
-    // Interrupt the producer/consumer threads
-    _interrupted.store(true);
 }
 
 void SocketProducerConsumer::onTunnelFrameReady(TunnelFrameBuffer buf) {

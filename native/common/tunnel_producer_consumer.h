@@ -37,8 +37,6 @@ public:
     TunnelProducerConsumer(std::vector<FileDescriptor> tunnelFds, int mtu);
     ~TunnelProducerConsumer();
 
-    void interrupt();
-
 private:
     // TunnelFramePipe methods
     void onTunnelFrameReady(TunnelFrameBuffer buf) override;

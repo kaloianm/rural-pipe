@@ -76,8 +76,6 @@ private:
     std::mutex _mutex;
     std::condition_variable _condVar;
 
-    bool _waitingForExit{false};
-
     // Will be set when `exit` is called (on the first invocation of `exit` will be taken into
     // account, the following ones will be ignored)
     boost::optional<int> _exitCode;

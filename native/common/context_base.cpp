@@ -89,9 +89,6 @@ ContextBase::ShouldStart ContextBase::start(int argc, const char *argv[],
 
 int ContextBase::waitForExit() {
     std::unique_lock<std::mutex> ul(_mutex);
-    BOOST_ASSERT(!_waitingForExit);
-    _waitingForExit = true;
-
     while (!_exitCode) {
         _condVar.wait(ul);
     }
