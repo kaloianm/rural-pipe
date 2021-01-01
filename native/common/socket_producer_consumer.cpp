@@ -147,7 +147,7 @@ void SocketProducerConsumer::_receiveFromSocketLoop(TunnelFrameStream &stream) {
                 break;
             } catch (const NotYetReadyException &) {
                 BOOST_LOG_TRIVIAL(debug) << "Not yet ready, retrying ...";
-                sleep(500);
+                sleep(1);
             }
         }
     }
