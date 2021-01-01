@@ -127,7 +127,7 @@ void SocketProducerConsumer::onTunnelFrameReady(TunnelFrameBuffer buf) {
     std::lock_guard<std::mutex> lg(_mutex);
 
     if (_streams.empty())
-        throw Exception("No client connected yet");
+        throw NotYetReadyException("The other side of the tunnel is not connected yet");
 
     // TODO: Choose a client/server connection to send it on based on some bandwidth requirements
     // metric
