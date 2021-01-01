@@ -55,13 +55,19 @@ public:
 
         _thread = std::thread([this] {
             BOOST_LOG_NAMED_SCOPE("clientControl");
-            try {
-                _socketPC.addSocket(
-                    SocketProducerConsumer::SocketConfig{_connectToServer("enp0s5")});
-                _ctx.waitForExit();
-            } catch (const std::exception &ex) {
-                BOOST_LOG_TRIVIAL(fatal) << "Client exited with error: " << ex.what();
-                _ctx.exit(1);
+            while (true) {
+                try {
+                    _socketPC.addSocket(
+                        SocketProducerConsumer::SocketConfig{_connectToServer("enp0s5")});
+                    _ctx.waitForExit();
+                    return;
+                } catch (const ConnRefusedSystemException &ex) {
+                    BOOST_LOG_TRIVIAL(debug) << "Server not yet ready, retrying ...";
+                    sleep(1);
+                } catch (const std::exception &ex) {
+                    BOOST_LOG_TRIVIAL(fatal) << "Client exited with error: " << ex.what();
+                    _ctx.exit(1);
+                }
             }
         });
     }

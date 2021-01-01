@@ -190,7 +190,15 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
         writer.header().seqNum = _seqNum.fetch_add(1);
         writer.close();
 
-        pipeInvoke(writer.buffer());
+        while (true) {
+            try {
+                pipeInvoke(writer.buffer());
+                break;
+            } catch (const NotYetReadyException &) {
+                BOOST_LOG_TRIVIAL(debug) << "Not yet ready, retrying ...";
+                sleep(500);
+            }
+        }
     }
 }
 

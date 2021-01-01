@@ -140,7 +140,16 @@ void SocketProducerConsumer::_receiveFromSocketLoop(TunnelFrameStream &stream) {
                             << " successful";
 
     while (!_interrupted.load()) {
-        pipeInvoke(stream.receive());
+        auto buf = stream.receive();
+        while (true) {
+            try {
+                pipeInvoke(buf);
+                break;
+            } catch (const NotYetReadyException &) {
+                BOOST_LOG_TRIVIAL(debug) << "Not yet ready, retrying ...";
+                sleep(500);
+            }
+        }
     }
 }
 

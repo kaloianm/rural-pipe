@@ -22,6 +22,15 @@
 #include <string.h>
 
 namespace ruralpi {
+namespace {
+
+std::string errnoMsg(int e) {
+    BOOST_ASSERT(e);
+    char buf[1024];
+    return boost::str(boost::format("(%d): %s") % e % strerror_r(e, buf, sizeof(buf)));
+}
+
+} // namespace
 
 Exception::Exception(std::string message) : _message(std::move(message)) {}
 
@@ -30,10 +39,17 @@ Exception::Exception(boost::format formatter) : Exception(formatter.str()) {}
 const char *Exception::what() const noexcept { return _message.c_str(); }
 
 void SystemException::throwFromErrno(const std::string &context) {
-    if (context.empty())
-        throw SystemException(boost::format("System error %s") % getLastError());
-    else
-        throw SystemException(boost::format("(%s): System error %s") % context % getLastError());
+    const int savedErrno = errno;
+    auto msg = context.empty()
+                   ? (boost::format("System error %s") % errnoMsg(savedErrno))
+                   : (boost::format("(%s): System error %s") % context % errnoMsg(savedErrno));
+
+    switch (savedErrno) {
+    case ECONNREFUSED:
+        throw ConnRefusedSystemException(std::move(msg));
+    default:
+        throw SystemException(std::move(msg));
+    };
 }
 
 void SystemException::throwFromErrno(const boost::format &context) {
@@ -42,14 +58,7 @@ void SystemException::throwFromErrno(const boost::format &context) {
 
 void SystemException::throwFromErrno() { throwFromErrno(""); }
 
-std::string SystemException::getLastError() {
-    BOOST_ASSERT(errno);
-    const int savedErrno = errno;
-
-    char buf[1024];
-    return boost::str(boost::format("(%d): %s") % savedErrno %
-                      strerror_r(savedErrno, buf, sizeof(buf)));
-}
+std::string SystemException::getLastError() { return errnoMsg(errno); }
 
 ScopedGuard::~ScopedGuard() {
     if (_fn)

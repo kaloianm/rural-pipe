@@ -36,6 +36,11 @@ private:
     std::string _message;
 };
 
+class NotYetReadyException : public Exception {
+public:
+    using Exception::Exception;
+};
+
 class SystemException : public Exception {
 public:
     using Exception::Exception;
@@ -55,6 +60,11 @@ public:
     static std::string getLastError();
 };
 
+class ConnRefusedSystemException : public SystemException {
+public:
+    using SystemException::SystemException;
+};
+
 #define SYSCALL_MSG(x, msg)                                                                        \
     [&] {                                                                                          \
         int res = x;                                                                               \
@@ -66,6 +76,8 @@ public:
 #define SYSCALL(x) SYSCALL_MSG(x, #x)
 
 class ScopedGuard {
+    ScopedGuard(ScopedGuard &) = delete;
+
 public:
     ScopedGuard(std::function<void()> fn) : _fn(std::move(fn)) {}
     ~ScopedGuard();

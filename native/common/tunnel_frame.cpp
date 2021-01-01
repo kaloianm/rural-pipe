@@ -37,7 +37,7 @@ public:
 
     void onTunnelFrameReady(TunnelFrameBuffer buf) {
         BOOST_LOG_TRIVIAL(debug) << "Received frame before the pipe was configured";
-        throw Exception("Not yet ready to receive frames");
+        throw NotYetReadyException("Not yet ready to receive frames");
     }
 
 } kNotYetReadyTunnelFramePipe;
