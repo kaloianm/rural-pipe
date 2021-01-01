@@ -21,6 +21,7 @@
 #include <boost/asio/ip/address.hpp>
 #include <linux/icmp.h>
 #include <netinet/ip.h>
+#include <netinet/udp.h>
 #include <string>
 
 namespace ruralpi {
@@ -37,6 +38,18 @@ struct ICMP : public StructCast<ICMP, icmphdr> {
 };
 
 struct TCP : public StructCast<TCP, tcphdr> {
+    std::string toString() const;
+};
+
+struct UDP : public StructCast<UDP, udphdr> {
+    std::string toString() const;
+};
+
+struct scopmcehdr {};
+
+struct SSCOPMCE : public StructCast<SSCOPMCE, scopmcehdr> {
+    static constexpr int kProtoNum = 128;
+
     std::string toString() const;
 };
 

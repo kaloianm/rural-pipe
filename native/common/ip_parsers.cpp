@@ -36,11 +36,23 @@ std::string TCP::toString() const {
     return ss.str();
 }
 
+std::string UDP::toString() const {
+    std::stringstream ss;
+    ss << " sport: " << ntohs(source) << " dport: " << ntohs(dest) << " len: " << ntohs(len);
+    return ss.str();
+}
+
+std::string SSCOPMCE::toString() const {
+    std::stringstream ss;
+    ss << "";
+    return ss.str();
+}
+
 std::string IP::toString() const {
     std::stringstream ss;
-    ss << " id: " << ntohs(id) << " proto: " << protocol
+    ss << " id: " << ntohs(id) << " proto: " << (int)protocol
        << " src: " << asio::ip::address_v4(ntohl(saddr))
-       << " dst: " << asio::ip::address_v4(ntohl(daddr));
+       << " dst: " << asio::ip::address_v4(ntohl(daddr)) << " len: " << ntohs(tot_len);
     return ss.str();
 }
 

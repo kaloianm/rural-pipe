@@ -39,16 +39,19 @@ void debugLogDatagram(uint8_t const *data, size_t size) {
     const auto &ip = IP::read(data);
     switch (ip.protocol) {
     case IPPROTO_ICMP:
-        BOOST_LOG_TRIVIAL(debug) << "Read " << ip.tot_len << " bytes of ICMP: " << ip.toString()
-                                 << ip.as<ICMP>().toString();
+        BOOST_LOG_TRIVIAL(debug) << "ICMP: " << ip.toString() << ip.as<ICMP>().toString();
         break;
     case IPPROTO_TCP:
-        BOOST_LOG_TRIVIAL(debug) << "Read " << ip.tot_len << " bytes of TCP: " << ip.toString()
-                                 << ip.as<TCP>().toString();
+        BOOST_LOG_TRIVIAL(debug) << "TCP: " << ip.toString() << ip.as<TCP>().toString();
         break;
+    case IPPROTO_UDP:
+        BOOST_LOG_TRIVIAL(debug) << "UDP: " << ip.toString() << ip.as<UDP>().toString();
+        break;
+    case SSCOPMCE::kProtoNum:
+        BOOST_LOG_TRIVIAL(debug) << "SSCOPMCE: " << ip.toString() << ip.as<SSCOPMCE>().toString();
     default:
-        BOOST_LOG_TRIVIAL(warning)
-            << "Read " << ip.tot_len << " bytes of unsupported protocol " << ip.toString();
+        BOOST_LOG_TRIVIAL(warning) << "UNKNOWN: " << ip.toString();
+        break;
     }
 }
 
