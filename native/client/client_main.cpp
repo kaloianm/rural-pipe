@@ -96,11 +96,11 @@ private:
         BOOST_LOG_TRIVIAL(debug) << "Address of " << interface << ": "
                                  << asio::ip::address_v4(ntohl(localAddr.sin_addr.s_addr));
 
-        // SYSCALL(::bind(sock, (const sockaddr *)&localAddr, sizeof(localAddr)));
         SYSCALL(
             ::setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, interface.c_str(), interface.size()));
 
         SYSCALL(::connect(sock, (struct sockaddr *)&_serverAddr, sizeof(_serverAddr)));
+        BOOST_LOG_TRIVIAL(info) << "Connected to server on interface " << interface;
 
         return std::move(sock);
     }

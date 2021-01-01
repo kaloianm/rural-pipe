@@ -24,6 +24,7 @@
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/log/utility/setup/console.hpp>
 #include <boost/log/utility/setup/file.hpp>
 #include <iostream>
 
@@ -39,6 +40,7 @@ ContextBase::ContextBase(std::string serviceName)
     // clang-format off
     _desc.add_options()
         ("help", "Produces this help message")
+        ("settings.log", po::value<std::string>(), "The name of the log file to use. If missing, logging will be to the console.")
         ("settings.nqueues", po::value<int>()->default_value(1), "Number of queues/threads to instantiate to listen on the tunnel device")
     ;
     // clang-format on
@@ -68,12 +70,18 @@ ContextBase::ShouldStart ContextBase::start(int argc, const char *argv[],
     nqueues = _vm["settings.nqueues"].as<int>();
 
     // Initialise the logging system
-    logging::add_file_log(logging::keywords::file_name = _serviceName + "_%N.log",
-                          logging::keywords::rotation_size = 10 * 1024 * 1024,
-                          logging::keywords::time_based_rotation =
-                              logging::sinks::file::rotation_at_time_point(0, 0, 0),
-                          logging::keywords::auto_flush = true,
-                          logging::keywords::format = "[%TimeStamp% (%Scope%)]: %Message%");
+    if (_vm.count("settings.log")) {
+        logging::add_file_log(logging::keywords::file_name =
+                                  _vm["settings.log"].as<std::string>() + "_%N.log",
+                              logging::keywords::rotation_size = 10 * 1024 * 1024,
+                              logging::keywords::time_based_rotation =
+                                  logging::sinks::file::rotation_at_time_point(0, 0, 0),
+                              logging::keywords::auto_flush = true,
+                              logging::keywords::format = "[%TimeStamp% (%Scope%)]: %Message%");
+    } else {
+        logging::add_console_log(std::cout, boost::log::keywords::format =
+                                                "[%TimeStamp% (%Scope%)] %Message%");
+    }
 
     logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
 

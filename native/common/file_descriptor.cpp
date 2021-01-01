@@ -55,9 +55,6 @@ ScopedFileDescriptor::ScopedFileDescriptor(ScopedFileDescriptor &&other) {
     if (&other == this)
         return;
 
-    BOOST_LOG_TRIVIAL(debug) << boost::format("File descriptor moved (%d): %s") % other._fd %
-                                    other._desc;
-
     _desc = std::move(other._desc);
     _fd = other._fd;
     other._fd = -1;
