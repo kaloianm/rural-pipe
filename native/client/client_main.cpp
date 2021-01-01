@@ -58,15 +58,16 @@ public:
             while (true) {
                 try {
                     _socketPC.addSocket(
-                        SocketProducerConsumer::SocketConfig{_connectToServer("enp0s5")});
+                        SocketProducerConsumer::SocketConfig{_connectToServer(_ctx.interfaces[0])});
                     _ctx.waitForExit();
-                    return;
+                    break;
                 } catch (const ConnRefusedSystemException &ex) {
                     BOOST_LOG_TRIVIAL(debug) << "Server not yet ready, retrying ...";
                     sleep(1);
                 } catch (const std::exception &ex) {
                     BOOST_LOG_TRIVIAL(fatal) << "Client exited with error: " << ex.what();
                     _ctx.exit(1);
+                    break;
                 }
             }
         });
@@ -82,6 +83,21 @@ public:
 private:
     ScopedFileDescriptor _connectToServer(const std::string &interface) {
         ScopedFileDescriptor sock(interface, ::socket(AF_INET, SOCK_STREAM, 0));
+
+        auto localAddr = [&] {
+            struct ifreq ifr = {0};
+            strcpy(ifr.ifr_name, interface.c_str());
+            SYSCALL(::ioctl(sock, SIOCGIFADDR, &ifr));
+            BOOST_ASSERT(ifr.ifr_ifru.ifru_addr.sa_family == AF_INET);
+            return *((struct sockaddr_in *)&ifr.ifr_ifru.ifru_addr);
+        }();
+
+        BOOST_LOG_TRIVIAL(debug) << "Address of " << interface << ": "
+                                 << asio::ip::address_v4(ntohl(localAddr.sin_addr.s_addr));
+
+        SYSCALL(
+            ::setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, interface.c_str(), interface.size()));
+
         SYSCALL(::connect(sock, (struct sockaddr *)&_serverAddr, sizeof(_serverAddr)));
 
         return std::move(sock);

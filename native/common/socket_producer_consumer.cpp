@@ -163,7 +163,7 @@ void TunnelFrameStream::send(TunnelFrameBuffer buf) {
         numWritten += _fd.write((void const *)buf.data, buf.size);
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "Written frame of " << numWritten << " bytes";
+    BOOST_LOG_TRIVIAL(debug) << "Sent tunnel frame of " << numWritten << " bytes";
 }
 
 TunnelFrameBuffer TunnelFrameStream::receive() {

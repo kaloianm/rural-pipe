@@ -31,6 +31,7 @@ struct Context : public ContextBase {
 
     std::string serverHost;
     int serverPort;
+    std::vector<std::string> interfaces;
 
 private:
     std::string _onCommand(int argc, const char *argv[]);

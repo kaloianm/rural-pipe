@@ -38,8 +38,7 @@ TunCtl::TunCtl(std::string deviceName, int numQueues) : _deviceName(std::move(de
     if (deviceName.length() >= IFNAMSIZ)
         throw Exception(boost::format("Device name %s is too long") % deviceName);
 
-    struct ifreq ifr;
-    memset(&ifr, 0, sizeof(ifr));
+    struct ifreq ifr = {0};
     strcpy(ifr.ifr_name, _deviceName.c_str());
 
     // Flags:   IFF_TUN   - TUN device (no Ethernet headers)
@@ -57,8 +56,7 @@ TunCtl::TunCtl(std::string deviceName, int numQueues) : _deviceName(std::move(de
 
 size_t TunCtl::getMTU() {
     ScopedFileDescriptor sock("MTU check socket", ::socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
-    struct ifreq ifr;
-    memset(&ifr, 0, sizeof(ifr));
+    struct ifreq ifr = {0};
     strcpy(ifr.ifr_name, _deviceName.c_str());
     SYSCALL(::ioctl(sock, SIOCGIFMTU, (void *)&ifr));
     return size_t(ifr.ifr_mtu);

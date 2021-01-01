@@ -29,6 +29,7 @@ Context::Context() : ContextBase("client") {
     _desc.add_options()
         ("settings.serverHost", po::value<std::string>()->required(), "Host on which the server is listening for connections")
         ("settings.serverPort", po::value<int>()->default_value(50003), "Port on which the server is listening for connections")
+        ("settings.interfaces", po::value<std::string>()->multitoken()->required(), "Set of interfaces through which to establish connections to the server")
     ;
     // clang-format on
 }
@@ -41,6 +42,7 @@ Context::ShouldStart Context::start(int argc, const char *argv[]) {
     if (shouldStart == kYes) {
         serverHost = _vm["settings.serverHost"].as<std::string>();
         serverPort = _vm["settings.serverPort"].as<int>();
+        interfaces = std::vector<std::string>{"enp0s5"}; // _vm["settings.interfaces"].as<std::vector<std::string>>();
     }
 
     return shouldStart;
