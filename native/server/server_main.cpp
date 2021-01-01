@@ -71,10 +71,9 @@ private:
 
             try {
                 struct sockaddr_in addr;
-                int addrlen;
-                int clientSocket = SYSCALL_MSG(
-                    ::accept(_serverSock, (struct sockaddr *)&addr, (socklen_t *)&addrlen),
-                    "Server failed to accept connection");
+                int addrlen = sizeof(addr);
+                int clientSocket =
+                    SYSCALL(::accept(_serverSock, (struct sockaddr *)&addr, (socklen_t *)&addrlen));
 
                 auto addr_v4 = asio::ip::address_v4(ntohl(addr.sin_addr.s_addr));
                 BOOST_LOG_TRIVIAL(info) << "Accepted connection from " << addr_v4;
