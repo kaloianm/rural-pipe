@@ -69,20 +69,21 @@ private:
         while (true) {
             SYSCALL(::listen(_serverSock, 1));
 
-            struct sockaddr_in addr;
-            int addrlen;
-            int clientSocket =
-                ::accept(_serverSock, (struct sockaddr *)&addr, (socklen_t *)&addrlen);
-            if (clientSocket < 0) {
-                BOOST_LOG_TRIVIAL(info) << "Failed to accept connection";
-                continue;
+            try {
+                struct sockaddr_in addr;
+                int addrlen;
+                int clientSocket = SYSCALL_MSG(
+                    ::accept(_serverSock, (struct sockaddr *)&addr, (socklen_t *)&addrlen),
+                    "Server failed to accept connection");
+
+                auto addr_v4 = asio::ip::address_v4(ntohl(addr.sin_addr.s_addr));
+                BOOST_LOG_TRIVIAL(info) << "Accepted connection from " << addr_v4;
+
+                _socketPC.addSocket(SocketProducerConsumer::SocketConfig{
+                    ScopedFileDescriptor(addr_v4.to_string(), clientSocket)});
+            } catch (const Exception &ex) {
+                BOOST_LOG_TRIVIAL(error) << ex.what();
             }
-
-            auto addr_v4 = asio::ip::address_v4(ntohl(addr.sin_addr.s_addr));
-            BOOST_LOG_TRIVIAL(info) << "Accepted connection from " << addr_v4;
-
-            _socketPC.addSocket(SocketProducerConsumer::SocketConfig{
-                ScopedFileDescriptor(addr_v4.to_string(), clientSocket)});
         }
     }
 
