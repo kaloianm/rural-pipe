@@ -33,6 +33,8 @@ if os.geteuid() != 0:
 async def start_client_and_wait(options):
     print('Starting client service with options: ', options)
 
+    if not os.path.exists('/tmp/client'):
+        os.mkfifo('/tmp/client', mode=0o666)
     client_process = await asyncio.create_subprocess_exec(os.path.join(sys.path[0], 'client'),
                                                           stdin=asyncio.subprocess.PIPE,
                                                           stdout=asyncio.subprocess.PIPE,

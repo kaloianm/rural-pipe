@@ -29,6 +29,8 @@ from optparse import OptionParser
 async def start_server_and_wait(options):
     print('Starting server service with options: ', options)
 
+    if not os.path.exists('/tmp/server'):
+        os.mkfifo('/tmp/server', mode=0o666)
     server_process = await asyncio.create_subprocess_exec(os.path.join(sys.path[0], 'server'),
                                                           stdin=asyncio.subprocess.PIPE,
                                                           stdout=asyncio.subprocess.PIPE,
