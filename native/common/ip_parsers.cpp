@@ -26,7 +26,7 @@ namespace asio = boost::asio;
 
 std::string ICMP::toString() const {
     std::stringstream ss;
-    ss << " type: " << uint8_t(type) << " code: " << uint8_t(code);
+    ss << " type: " << (int)type << " code: " << int(code);
     return ss.str();
 }
 
