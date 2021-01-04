@@ -19,6 +19,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import asyncio
+import ipaddress
 import os
 import sys
 
@@ -27,7 +28,11 @@ from optparse import OptionParser
 
 
 async def start_server_and_wait(options):
-    print('Starting server service with options: ', options)
+    print('Starting server service with options:', options)
+
+    ip_iface = ipaddress.ip_interface(options.bind_ip)
+    ip_network = ipaddress.ip_network(ip_iface.network)
+    print('Network:', str(ip_network.network_address))
 
     if not os.path.exists('/tmp/server'):
         os.mkfifo('/tmp/server', mode=0o666)
@@ -52,6 +57,23 @@ async def start_server_and_wait(options):
     ipcmd = await asyncio.create_subprocess_shell('ip addr add ' + options.bind_ip + ' dev rpis')
     await ipcmd.wait()
 
+    # Allow traffic initiated from the client to access "the world"
+    ipcmd = await asyncio.create_subprocess_shell('iptables -I FORWARD -i rpis -o ' +
+                                                  options.wan_interface + ' -s ' + str(ip_network) +
+                                                  ' -m conntrack --ctstate NEW -j ACCEPT')
+    await ipcmd.wait()
+
+    # Allow established traffic to pass back and forth
+    ipcmd = await asyncio.create_subprocess_shell(
+        'iptables -I FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT')
+    await ipcmd.wait()
+
+    # Masquerade traffic from VPN to "the world" -- done in the nat table
+    ipcmd = await asyncio.create_subprocess_shell('iptables -t nat -I POSTROUTING -o ' +
+                                                  options.wan_interface + ' -s ' + str(ip_network) +
+                                                  ' -j MASQUERADE')
+    await ipcmd.wait()
+
     print('Routing configured')
 
     while True:
@@ -70,8 +92,11 @@ def main():
     config_files_read = config.read('server.cfg')
 
     parser = OptionParser()
-    parser.add_option('--bindip', dest='bind_ip', help='IP address to which to bind the network',
-                      default=config.get('settings', 'bindip'))
+    parser.add_option('--bind_ip', dest='bind_ip', help='IP address to which to bind the network',
+                      default=config.get('settings', 'bind_ip'))
+    parser.add_option('--wan_interface', dest='wan_interface',
+                      help='Interface on which all traffic to the internet must go',
+                      default=config.get('settings', 'wan_interface'))
 
     (options, args) = parser.parse_args()
     sys.exit(asyncio.run(start_server_and_wait(options)))

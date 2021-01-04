@@ -19,6 +19,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import asyncio
+import ipaddress
 import os
 import sys
 
@@ -31,7 +32,11 @@ if os.geteuid() != 0:
 
 
 async def start_client_and_wait(options):
-    print('Starting client service with options: ', options)
+    print('Starting client service with options:', options)
+
+    ip_iface = ipaddress.ip_interface(options.bind_ip)
+    ip_network = ipaddress.ip_network(ip_iface.network)
+    print('Network:', str(ip_network.network_address))
 
     if not os.path.exists('/tmp/client'):
         os.mkfifo('/tmp/client', mode=0o666)
@@ -74,8 +79,8 @@ def main():
     config_files_read = config.read('client.cfg')
 
     parser = OptionParser()
-    parser.add_option('--bindip', dest='bind_ip', help='IP address to which to bind the network',
-                      default=config.get('settings', 'bindip'))
+    parser.add_option('--bind_ip', dest='bind_ip', help='IP address to which to bind the network',
+                      default=config.get('settings', 'bind_ip'))
 
     (options, args) = parser.parse_args()
     sys.exit(asyncio.run(start_client_and_wait(options)))
