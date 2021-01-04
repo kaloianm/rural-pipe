@@ -32,7 +32,7 @@ namespace {
 
 using Milliseconds = std::chrono::milliseconds;
 
-const std::chrono::seconds kWaitForData(5);
+const std::chrono::seconds kWaitForData(30);
 const std::chrono::milliseconds kWaitForBatch(5);
 
 void debugLogDatagram(uint8_t const *data, size_t size) {
@@ -112,7 +112,9 @@ void TunnelProducerConsumer::onTunnelFrameReady(TunnelFrameBuffer buf) {
         // queue
         const auto &ip = IP::read(reader.data());
         auto &tunnelFd = _tunnelFds[(ip.saddr + ip.daddr) % _tunnelFds.size()];
-        tunnelFd.write(reader.data(), reader.size());
+        int numWritten = tunnelFd.write(reader.data(), reader.size());
+        BOOST_LOG_TRIVIAL(debug) << "Written " << numWritten << " byte datagram to tunnel socket "
+                                 << tunnelFd;
     }
 }
 
@@ -172,7 +174,7 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
             if (!mtuBufferSize) {
                 mtuBufferSize = tunnelFd.read(mtu, _mtu);
                 BOOST_LOG_TRIVIAL(debug)
-                    << "Received " << mtuBufferSize << " bytes from tunnel socket " << tunnelFd;
+                    << "Received " << mtuBufferSize << " datagram from tunnel socket " << tunnelFd;
             }
 
             if (mtuBufferSize > writer.remainingBytes()) {
@@ -198,7 +200,7 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
             } catch (const NotYetReadyException &ex) {
                 BOOST_LOG_TRIVIAL(debug)
                     << "Client/server not yet ready: " << ex.what() << "; retrying ...";
-                sleep(1);
+                sleep(5);
             }
         }
     }

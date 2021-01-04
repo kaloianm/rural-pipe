@@ -148,7 +148,7 @@ void SocketProducerConsumer::_receiveFromSocketLoop(TunnelFrameStream &stream) {
             } catch (const NotYetReadyException &ex) {
                 BOOST_LOG_TRIVIAL(debug)
                     << "Tunnel not yet ready: " << ex.what() << "; retrying ...";
-                sleep(1);
+                sleep(5);
             }
         }
     }
@@ -164,14 +164,16 @@ void TunnelFrameStream::send(TunnelFrameBuffer buf) {
         numWritten += _fd.write((void const *)buf.data, buf.size);
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "Sent tunnel frame of " << numWritten << " bytes";
+    BOOST_LOG_TRIVIAL(debug) << "Sent frame of " << numWritten << " bytes";
 }
 
 TunnelFrameBuffer TunnelFrameStream::receive() {
     int numRead = _fd.read((void *)_buffer, sizeof(TunnelFrameHeader));
 
+    uint64_t seqNum = ((TunnelFrameHeader *)_buffer)->seqNum;
     size_t totalSize = ((TunnelFrameHeader *)_buffer)->desc.size;
-    BOOST_LOG_TRIVIAL(debug) << "Received a header of a frame of size " << totalSize;
+    BOOST_LOG_TRIVIAL(debug) << "Received the header of frame " << seqNum << " (" << totalSize
+                             << " bytes)";
 
     while (numRead < totalSize) {
         numRead += read(_fd, (void *)&_buffer[numRead], totalSize - numRead);

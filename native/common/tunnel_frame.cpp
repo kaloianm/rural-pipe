@@ -24,9 +24,6 @@
 #include "common/exception.h"
 
 namespace ruralpi {
-
-using boost::format;
-
 namespace {
 
 const uint8_t kVersion = 1;
@@ -47,7 +44,7 @@ TunnelFrameReader::TunnelFrameReader(const ConstTunnelFrameBuffer &buf)
     : _begin(buf.data), _current(_begin), _end(_begin + buf.size) {
     const auto &hdr = header();
     if (hdr.desc.version != kVersion)
-        throw Exception(format("Unrecognised tunnel frame version %1%") % hdr.desc.version);
+        throw Exception(boost::format("Unrecognised tunnel frame version %1%") % hdr.desc.version);
 }
 
 TunnelFrameReader::TunnelFrameReader(const TunnelFrameBuffer &buf)

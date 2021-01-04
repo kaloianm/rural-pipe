@@ -64,7 +64,7 @@ public:
                 } catch (const ConnRefusedSystemException &ex) {
                     BOOST_LOG_TRIVIAL(debug)
                         << "Server not yet ready due to error: " << ex.what() << "; retrying ...";
-                    sleep(1);
+                    sleep(5);
                 } catch (const std::exception &ex) {
                     BOOST_LOG_TRIVIAL(fatal) << "Client exited with error: " << ex.what();
                     _ctx.exit(1);
