@@ -210,6 +210,8 @@ void serverTestsMain() {
         BOOST_LOG_TRIVIAL(info) << "Running socketProducerConsumerTests ...";
         socketProducerConsumerTests();
     }
+
+    BOOST_LOG_TRIVIAL(info) << "All tests succeeded!";
 }
 
 } // namespace

@@ -73,17 +73,19 @@ ContextBase::ShouldStart ContextBase::start(int argc, const char *argv[],
     if (_vm.count("settings.log")) {
         logging::add_file_log(logging::keywords::file_name =
                                   _vm["settings.log"].as<std::string>() + "_%N.log",
-                              logging::keywords::rotation_size = 10 * 1024 * 1024,
+                              logging::keywords::rotation_size = 256 * 1024 * 1024,
                               logging::keywords::time_based_rotation =
                                   logging::sinks::file::rotation_at_time_point(0, 0, 0),
                               logging::keywords::auto_flush = true,
                               logging::keywords::format = "[%TimeStamp% (%Scope%)]: %Message%");
+
+        logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::info);
     } else {
         logging::add_console_log(std::cout, boost::log::keywords::format =
                                                 "[%TimeStamp% (%Scope%)] %Message%");
-    }
 
-    logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
+        logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
+    }
 
     logging::add_common_attributes();
     logging::core::get()->add_global_attribute("Scope", boost::log::attributes::named_scope());
