@@ -125,7 +125,6 @@ public:
      * whether the current pointer of the reader is located or whether there are any datagrams.
      */
     TunnelFrameHeader &header() const { return *((TunnelFrameHeader *)_begin); }
-    TunnelFrameBuffer buffer() const { return {_begin, header().desc.size}; }
 
     /**
      * Returns a pointer to a block of memory of maximum size `remainingBytes()` where the next
@@ -134,13 +133,13 @@ public:
     uint8_t *data() const { return _current + sizeof(TunnelFrameDatagramSeparator); }
 
     /**
-     * Returns the biggest datagram which can be written to `current()`.
+     * Returns the biggest datagram which can be written to `data()`.
      */
-    size_t remainingBytes() const { return _end - data(); }
+    size_t remainingBytes() const { return (_end - data()) - sizeof(TunnelFrameDatagramSeparator); }
 
     /**
-     * Must be invoked every time datagram is written to `current()` and must be passed the size of
-     * the datagram.
+     * Must be invoked every time datagram is written to `data()` and must be passed the size of the
+     * datagram.
      */
     void onDatagramWritten(size_t size);
 
@@ -149,6 +148,7 @@ public:
      * the header of the frame and return the actual number of bytes which it contains.
      */
     void close();
+    TunnelFrameBuffer buffer() const { return {_begin, header().desc.size}; }
 
     /**
      * These methods are here just to facilitate the writing of unit-tests and should not be used in
