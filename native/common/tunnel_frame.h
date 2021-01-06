@@ -25,9 +25,6 @@
 
 namespace ruralpi {
 
-// Maximum size of each tunnel frame. Actual frames might actually be smaller than that.
-static constexpr size_t kTunnelFrameMaxSize = 4096;
-
 struct ConstTunnelFrameBuffer {
     uint8_t const *data;
     size_t size;
@@ -48,14 +45,14 @@ struct TunnelFrameHeaderInfo {
     char magic[3];
 
     struct Desc {
-        uint16_t version : 2;
-        uint16_t flags : 2;
-        uint16_t size : 12;
+        uint8_t version : 2;
+        uint8_t flags : 6;
+        uint16_t size;
     } desc;
 
     static const TunnelFrameHeaderInfo &check(const ConstTunnelFrameBuffer &buf);
 };
-BOOST_STATIC_ASSERT(sizeof(TunnelFrameHeaderInfo) == 5);
+BOOST_STATIC_ASSERT(sizeof(TunnelFrameHeaderInfo) == 6);
 
 // Every tunnel frame starts with this header
 struct TunnelFrameHeader : public TunnelFrameHeaderInfo {
@@ -72,13 +69,17 @@ struct TunnelFrameHeader : public TunnelFrameHeaderInfo {
     // to `desc.size`)
     char signature[128];
 };
-BOOST_STATIC_ASSERT(sizeof(TunnelFrameHeader) == 157);
+BOOST_STATIC_ASSERT(sizeof(TunnelFrameHeader) == 158);
 
 // The datagrams in each tunnel frame are separated with this structure
 struct TunnelFrameDatagramSeparator {
     uint16_t size;
 };
 BOOST_STATIC_ASSERT(sizeof(TunnelFrameDatagramSeparator) == 2);
+
+constexpr size_t kTunnelFrameMinSize =
+    sizeof(TunnelFrameHeader) + sizeof(TunnelFrameDatagramSeparator);
+constexpr size_t kTunnelFrameMaxSize = 4096;
 
 // The first tunnel frame exchanged between client and server (seqNum 0) contains a single
 // "datagram" with this structure
@@ -111,8 +112,8 @@ public:
     size_t size() const { return ((TunnelFrameDatagramSeparator *)_current)->size; }
 
 private:
-    uint8_t const *_begin;
-    uint8_t const *_end;
+    uint8_t const *const _begin;
+    uint8_t const *const _end;
     uint8_t const *_current;
 };
 
@@ -127,15 +128,15 @@ public:
     TunnelFrameHeader &header() const { return *((TunnelFrameHeader *)_begin); }
 
     /**
+     * Returns the biggest datagram which can be written to `data()`.
+     */
+    size_t remainingBytes() const;
+
+    /**
      * Returns a pointer to a block of memory of maximum size `remainingBytes()` where the next
      * datagram should be written.
      */
     uint8_t *data() const { return _current + sizeof(TunnelFrameDatagramSeparator); }
-
-    /**
-     * Returns the biggest datagram which can be written to `data()`.
-     */
-    size_t remainingBytes() const { return (_end - data()) - sizeof(TunnelFrameDatagramSeparator); }
 
     /**
      * Must be invoked every time datagram is written to `data()` and must be passed the size of the
@@ -154,12 +155,13 @@ public:
      * These methods are here just to facilitate the writing of unit-tests and should not be used in
      * production code.
      */
-    void appendBytes(uint8_t const *ptr, size_t size);
-    void appendString(const char str[]);
+    void append(uint8_t const *ptr, size_t size);
+    void append(const char str[]);
+    void append(const std::string &str);
 
 private:
-    uint8_t *_begin;
-    uint8_t *_end;
+    uint8_t *const _begin;
+    uint8_t *const _end;
     uint8_t *_current;
 };
 

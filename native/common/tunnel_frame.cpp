@@ -79,31 +79,47 @@ bool TunnelFrameReader::next() {
 
 TunnelFrameWriter::TunnelFrameWriter(const TunnelFrameBuffer &buf)
     : _begin(buf.data), _current(_begin + sizeof(TunnelFrameHeader)), _end(_begin + buf.size) {
-    memcpy(header().magic, TunnelFrameHeader::kMagic, sizeof(TunnelFrameHeader::kMagic));
-    header().desc.version = kVersion;
-    header().desc.size = 0;
+    BOOST_ASSERT(buf.size >= kTunnelFrameMinSize);
+    BOOST_ASSERT(buf.size <= kTunnelFrameMaxSize);
+
+    auto &hdr = header();
+    memcpy(hdr.magic, TunnelFrameHeader::kMagic, sizeof(TunnelFrameHeader::kMagic));
+    hdr.desc.version = kVersion;
+    hdr.desc.flags = 0;
+    hdr.desc.size = 0;
+}
+
+size_t TunnelFrameWriter::remainingBytes() const {
+    int diff = _end - data();
+    if (!diff)
+        return 0;
+
+    BOOST_ASSERT(diff >= sizeof(TunnelFrameDatagramSeparator));
+    return diff - sizeof(TunnelFrameDatagramSeparator);
 }
 
 void TunnelFrameWriter::onDatagramWritten(size_t size) {
     ((TunnelFrameDatagramSeparator *)_current)->size = size;
     _current += sizeof(TunnelFrameDatagramSeparator) + size;
+    BOOST_ASSERT(_current <= _end);
 }
 
 void TunnelFrameWriter::close() {
     onDatagramWritten(0);
 
-    auto &hdr = *((TunnelFrameHeader *)_begin);
-    hdr.desc.flags = 0;
+    auto &hdr = header();
     hdr.desc.size = _current - _begin;
 }
 
-void TunnelFrameWriter::appendBytes(uint8_t const *ptr, size_t size) {
+void TunnelFrameWriter::append(uint8_t const *ptr, size_t size) {
     memcpy((void *)data(), (void *)ptr, size);
     onDatagramWritten(size);
 }
 
-void TunnelFrameWriter::appendString(const char str[]) {
-    appendBytes((uint8_t const *)str, strlen(str) + 1);
+void TunnelFrameWriter::append(const char str[]) { append((uint8_t const *)str, strlen(str) + 1); }
+
+void TunnelFrameWriter::append(const std::string &str) {
+    append((uint8_t const *)str.c_str(), str.size());
 }
 
 TunnelFramePipe::TunnelFramePipe() : TunnelFramePipe(&kNotYetReadyTunnelFramePipe) {}
