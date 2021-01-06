@@ -83,7 +83,8 @@ public:
 
 private:
     ScopedFileDescriptor _connectToServer(const std::string &interface) {
-        ScopedFileDescriptor sock(interface, ::socket(AF_INET, SOCK_STREAM, 0));
+        ScopedFileDescriptor sock(boost::str(boost::format("Server on %s") % interface),
+                                  ::socket(AF_INET, SOCK_STREAM, 0));
 
         auto localAddr = [&] {
             struct ifreq ifr = {0};
@@ -93,8 +94,8 @@ private:
             return *((struct sockaddr_in *)&ifr.ifr_ifru.ifru_addr);
         }();
 
-        BOOST_LOG_TRIVIAL(debug) << "Address of " << interface << ": "
-                                 << asio::ip::address_v4(ntohl(localAddr.sin_addr.s_addr));
+        BOOST_LOG_TRIVIAL(info) << "Address of " << interface << ": "
+                                << asio::ip::address_v4(ntohl(localAddr.sin_addr.s_addr));
 
         SYSCALL(
             ::setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, interface.c_str(), interface.size()));

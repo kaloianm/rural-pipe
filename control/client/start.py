@@ -58,7 +58,9 @@ async def start_client_and_wait(options):
 
     ipcmd = await asyncio.create_subprocess_shell('ip link set rpic up')
     await ipcmd.wait()
-    ipcmd = await asyncio.create_subprocess_shell('ip addr add ' + options.bind_ip + ' dev rpic')
+    ipcmd = await asyncio.create_subprocess_shell('ip addr add ' + str(ip_iface) + ' dev rpic')
+    await ipcmd.wait()
+    ipcmd = await asyncio.create_subprocess_shell('ip route add default via ' + str(ip_iface.ip))
     await ipcmd.wait()
 
     print('Routing configured')

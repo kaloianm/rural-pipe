@@ -19,8 +19,8 @@
 #pragma once
 
 #include <atomic>
+#include <boost/asio/thread_pool.hpp>
 #include <mutex>
-#include <thread>
 #include <vector>
 
 #include "common/file_descriptor.h"
@@ -54,7 +54,7 @@ private:
     int _mtu;
 
     // Set of threads draining the file descriptors from `_tunnelFds`
-    std::vector<std::thread> _threads;
+    boost::asio::thread_pool _pool;
 
     // Serves as a source for sequencing the tunnel frames
     std::atomic<uint64_t> _seqNum{0};

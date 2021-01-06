@@ -18,6 +18,7 @@
 
 #include "common/socket_producer_consumer.h"
 
+#include <boost/asio.hpp>
 #include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/uuid/random_generator.hpp>
@@ -83,10 +84,7 @@ SocketProducerConsumer::SocketProducerConsumer(bool isClient, TunnelFramePipe &p
 
 SocketProducerConsumer::~SocketProducerConsumer() {
     _interrupted.store(true);
-
-    for (auto &t : _threads) {
-        t.join();
-    }
+    _pool.join();
 
     pipeDetach();
     BOOST_LOG_TRIVIAL(info) << "Socket producer/consumer finished";
@@ -106,9 +104,19 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
 
     std::lock_guard<std::mutex> lg(_mutex);
 
-    _streams.emplace_back(std::move(config.fd));
-    _threads.emplace_back([this, &stream = _streams.back()] {
+    boost::asio::post([this, it = _streams.emplace(_streams.end(), std::move(config.fd))] {
         BOOST_LOG_NAMED_SCOPE("_receiveFromSocketLoop");
+
+        ScopedGuard sg([this, it] {
+            std::lock_guard<std::mutex> lg(_mutex);
+            _streams.erase(it);
+        });
+
+        auto &stream = [&]() -> auto & {
+            std::lock_guard<std::mutex> lg(_mutex);
+            return *it;
+        }
+        ();
 
         try {
             _receiveFromSocketLoop(stream);

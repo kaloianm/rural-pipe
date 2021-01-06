@@ -19,10 +19,9 @@
 #pragma once
 
 #include <atomic>
+#include <boost/asio/thread_pool.hpp>
 #include <list>
 #include <mutex>
-#include <string>
-#include <thread>
 
 #include "common/file_descriptor.h"
 #include "common/tunnel_frame.h"
@@ -87,15 +86,17 @@ private:
     // Indicates whether this socket is run as a client or server
     const bool _isClient;
 
+    // Set of threads draining the streams from `_streams`
+    boost::asio::thread_pool _pool;
+
     // Mutex to protect access to the state below
     std::mutex _mutex;
 
     // Associated with the `_receiveFromSocketLoop`
     std::atomic<bool> _interrupted{false};
 
-    // Set of streams and associated threads to drain them
+    // Set of streams to the connected clients or server
     std::list<TunnelFrameStream> _streams;
-    std::list<std::thread> _threads;
 };
 
 } // namespace ruralpi

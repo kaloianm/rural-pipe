@@ -78,8 +78,8 @@ private:
                 auto addr_v4 = asio::ip::address_v4(ntohl(addr.sin_addr.s_addr));
                 BOOST_LOG_TRIVIAL(info) << "Accepted connection from " << addr_v4;
 
-                _socketPC.addSocket(SocketProducerConsumer::SocketConfig{
-                    ScopedFileDescriptor(addr_v4.to_string(), clientSocket)});
+                _socketPC.addSocket(SocketProducerConsumer::SocketConfig{ScopedFileDescriptor(
+                    boost::str(boost::format("Client ") % addr_v4.to_string()), clientSocket)});
             } catch (const Exception &ex) {
                 BOOST_LOG_TRIVIAL(error) << ex.what();
             }
@@ -89,6 +89,7 @@ private:
     Context &_ctx;
     SocketProducerConsumer &_socketPC;
 
+    // Socket on which the server listens for connections
     ScopedFileDescriptor _serverSock;
 
     std::thread _thread;

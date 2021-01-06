@@ -54,24 +54,7 @@ async def start_server_and_wait(options):
 
     ipcmd = await asyncio.create_subprocess_shell('ip link set rpis up')
     await ipcmd.wait()
-    ipcmd = await asyncio.create_subprocess_shell('ip addr add ' + options.bind_ip + ' dev rpis')
-    await ipcmd.wait()
-
-    # Allow traffic initiated from the client to access "the world"
-    ipcmd = await asyncio.create_subprocess_shell('iptables -I FORWARD -i rpis -o ' +
-                                                  options.wan_interface + ' -s ' + str(ip_network) +
-                                                  ' -m conntrack --ctstate NEW -j ACCEPT')
-    await ipcmd.wait()
-
-    # Allow established traffic to pass back and forth
-    ipcmd = await asyncio.create_subprocess_shell(
-        'iptables -I FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT')
-    await ipcmd.wait()
-
-    # Masquerade traffic from VPN to "the world" -- done in the nat table
-    ipcmd = await asyncio.create_subprocess_shell('iptables -t nat -I POSTROUTING -o ' +
-                                                  options.wan_interface + ' -s ' + str(ip_network) +
-                                                  ' -j MASQUERADE')
+    ipcmd = await asyncio.create_subprocess_shell('ip addr add ' + str(ip_iface) + ' dev rpis')
     await ipcmd.wait()
 
     print('Routing configured')
