@@ -79,7 +79,7 @@ private:
                 BOOST_LOG_TRIVIAL(info) << "Accepted connection from " << addr_v4;
 
                 _socketPC.addSocket(SocketProducerConsumer::SocketConfig{ScopedFileDescriptor(
-                    boost::str(boost::format("Client ") % addr_v4.to_string()), clientSocket)});
+                    boost::str(boost::format("Client %s") % addr_v4.to_string()), clientSocket)});
             } catch (const Exception &ex) {
                 BOOST_LOG_TRIVIAL(error) << ex.what();
             }
