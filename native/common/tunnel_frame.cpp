@@ -40,29 +40,33 @@ public:
 
 } // namespace
 
-constexpr char TunnelFrameHeader::kMagic[3];
+constexpr char TunnelFrameHeaderInfo::kMagic[3];
+
+const TunnelFrameHeaderInfo &TunnelFrameHeaderInfo::check(const ConstTunnelFrameBuffer &buf) {
+    if (buf.size < sizeof(TunnelFrameHeaderInfo))
+        throw Exception(boost::format("Invalid tunnel frame header size %1%") % buf.size);
+
+    const auto &hdrInfo = *((TunnelFrameHeaderInfo const *)buf.data);
+    if (memcmp(hdrInfo.magic, TunnelFrameHeaderInfo::kMagic,
+               sizeof(TunnelFrameHeaderInfo::kMagic) != 0))
+        throw Exception(boost::format("Unrecognised tunnel frame magic number %1%") %
+                        hdrInfo.magic);
+    if (hdrInfo.desc.version != kVersion)
+        throw Exception(boost::format("Unrecognised tunnel frame version %1%") %
+                        hdrInfo.desc.version);
+    if (hdrInfo.desc.size > kTunnelFrameMaxSize)
+        throw Exception(boost::format("Invalid tunnel frame size %1%") % hdrInfo.desc.size);
+
+    return hdrInfo;
+}
 
 TunnelFrameReader::TunnelFrameReader(const ConstTunnelFrameBuffer &buf)
     : _begin(buf.data), _current(_begin), _end(_begin + buf.size) {
-    checkHeader(buf);
+    // TODO: Check the signature
 }
 
 TunnelFrameReader::TunnelFrameReader(const TunnelFrameBuffer &buf)
     : TunnelFrameReader(ConstTunnelFrameBuffer{buf.data, buf.size}) {}
-
-const TunnelFrameHeader &TunnelFrameReader::checkHeader(const ConstTunnelFrameBuffer &buf) {
-    if (buf.size < sizeof(TunnelFrameHeader))
-        throw Exception(boost::format("Invalid tunnel frame header size %1%") % buf.size);
-
-    const auto &hdr = *((TunnelFrameHeader const *)buf.data);
-    if (memcmp(hdr.magic, TunnelFrameHeader::kMagic, sizeof(TunnelFrameHeader::kMagic) != 0))
-        throw Exception(boost::format("Unrecognised tunnel frame magic number %1%") % hdr.magic);
-    if (hdr.desc.version != kVersion)
-        throw Exception(boost::format("Unrecognised tunnel frame version %1%") % hdr.desc.version);
-    // TODO: Check the rest of the fields
-
-    return hdr;
-}
 
 bool TunnelFrameReader::next() {
     if (_current == _begin)

@@ -39,7 +39,8 @@ struct InitalExchangeResult {
 };
 
 InitalExchangeResult initialTunnelFrameExchange(TunnelFrameStream &stream, bool isClient) {
-    uint8_t buffer[512];
+    uint8_t buffer[1024];
+    memset(buffer, 0xAA, sizeof(buffer));
 
     if (isClient) {
         TunnelFrameWriter writer({buffer, sizeof(buffer)});
@@ -176,17 +177,19 @@ void TunnelFrameStream::send(TunnelFrameBuffer buf) {
 }
 
 TunnelFrameBuffer TunnelFrameStream::receive() {
-    size_t numRead = _fd.read((void *)_buffer, sizeof(TunnelFrameHeader));
+    size_t numRead = 0;
 
-    const auto &hdr = TunnelFrameReader::checkHeader({_buffer, numRead});
-    const size_t totalSize = hdr.desc.size;
-    BOOST_LOG_TRIVIAL(debug) << "Received header of frame " << hdr.seqNum << " (" << totalSize
-                             << " bytes)";
+    while (numRead < sizeof(TunnelFrameHeaderInfo)) {
+        numRead += _fd.read((void *)&_buffer[numRead], sizeof(TunnelFrameHeaderInfo) - numRead);
+    }
+
+    const auto &hdrInfo = TunnelFrameHeaderInfo::check({_buffer, numRead});
+    const size_t totalSize = hdrInfo.desc.size;
+    BOOST_LOG_TRIVIAL(debug) << "Received header of frame of size " << hdrInfo.desc.size
+                             << " bytes";
 
     while (numRead < totalSize) {
         numRead += _fd.read((void *)&_buffer[numRead], totalSize - numRead);
-
-        BOOST_LOG_TRIVIAL(debug) << "Received " << numRead << " bytes so far";
     }
 
     BOOST_ASSERT(numRead == totalSize);

@@ -28,13 +28,21 @@ namespace ruralpi {
 // Maximum size of each tunnel frame. Actual frames might actually be smaller than that.
 static constexpr size_t kTunnelFrameMaxSize = 4096;
 
+struct ConstTunnelFrameBuffer {
+    uint8_t const *data;
+    size_t size;
+};
+
+struct TunnelFrameBuffer {
+    uint8_t *data;
+    size_t size;
+};
+
 #pragma pack(push, 1)
 
-// Every tunnel frame starts with this header
-struct TunnelFrameHeader {
+// Every tunnel frame header starts with this informational section
+struct TunnelFrameHeaderInfo {
     static constexpr char kMagic[3] = {'R', 'P', 'I'};
-
-    static constexpr uint64_t kInitialSeqNum = 0;
 
     // Fix magic value to differentiate the start of each tunnel frame (always set to `kMagic`)
     char magic[3];
@@ -45,9 +53,13 @@ struct TunnelFrameHeader {
         uint16_t size : 12;
     } desc;
 
-    // Cryptographic signature of all the contents of the frame, which follow after this field (up
-    // to `desc.size`)
-    char signature[128];
+    static const TunnelFrameHeaderInfo &check(const ConstTunnelFrameBuffer &buf);
+};
+BOOST_STATIC_ASSERT(sizeof(TunnelFrameHeaderInfo) == 5);
+
+// Every tunnel frame starts with this header
+struct TunnelFrameHeader : public TunnelFrameHeaderInfo {
+    static constexpr uint64_t kInitialSeqNum = 0;
 
     // For which session does this frame apply
     boost::uuids::uuid sessionId;
@@ -55,6 +67,10 @@ struct TunnelFrameHeader {
     // Sequence number from the point of view of the sender of the frame. I.e., both client and
     // server send their own sequence numbers which need to be consecutive
     uint64_t seqNum;
+
+    // Cryptographic signature of all the contents of the frame, which follow after this field (up
+    // to `desc.size`)
+    char signature[128];
 };
 BOOST_STATIC_ASSERT(sizeof(TunnelFrameHeader) == 157);
 
@@ -73,25 +89,10 @@ BOOST_STATIC_ASSERT(sizeof(InitTunnelFrame) == 16);
 
 #pragma pack(pop)
 
-struct ConstTunnelFrameBuffer {
-    uint8_t const *data;
-    size_t size;
-};
-
-struct TunnelFrameBuffer {
-    uint8_t *data;
-    size_t size;
-};
-
 class TunnelFrameReader {
 public:
     TunnelFrameReader(const ConstTunnelFrameBuffer &buf);
     TunnelFrameReader(const TunnelFrameBuffer &buf);
-
-    /**
-     * Performs just a cursory check that the passed in buffer contains a valid tunnel frame header.
-     */
-    static const TunnelFrameHeader &checkHeader(const ConstTunnelFrameBuffer &buf);
 
     /**
      * Provides direct access to the header of the frame and is available at any time, regardless of
