@@ -19,6 +19,7 @@
 #pragma once
 
 #include <array>
+#include <boost/static_assert.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <mutex>
 
@@ -28,9 +29,15 @@ namespace ruralpi {
 static constexpr size_t kTunnelFrameMaxSize = 4096;
 
 #pragma pack(push, 1)
+
 // Every tunnel frame starts with this header
 struct TunnelFrameHeader {
+    static constexpr char kMagic[3] = {'R', 'P', 'I'};
+
     static constexpr uint64_t kInitialSeqNum = 0;
+
+    // Fix magic value to differentiate the start of each tunnel frame (always set to `kMagic`)
+    char magic[3];
 
     struct Desc {
         uint16_t version : 2;
@@ -38,23 +45,32 @@ struct TunnelFrameHeader {
         uint16_t size : 12;
     } desc;
 
+    // Cryptographic signature of all the contents of the frame, which follow after this field (up
+    // to `desc.size`)
     char signature[128];
 
-    // The signature covers all fields and data which follow from that point onwards
+    // For which session does this frame apply
     boost::uuids::uuid sessionId;
+
+    // Sequence number from the point of view of the sender of the frame. I.e., both client and
+    // server send their own sequence numbers which need to be consecutive
     uint64_t seqNum;
 };
+BOOST_STATIC_ASSERT(sizeof(TunnelFrameHeader) == 157);
 
 // The datagrams in each tunnel frame are separated with this structure
 struct TunnelFrameDatagramSeparator {
     uint16_t size;
 };
+BOOST_STATIC_ASSERT(sizeof(TunnelFrameDatagramSeparator) == 2);
 
 // The first tunnel frame exchanged between client and server (seqNum 0) contains a single
 // "datagram" with this structure
 struct InitTunnelFrame {
     char identifier[16];
 };
+BOOST_STATIC_ASSERT(sizeof(InitTunnelFrame) == 16);
+
 #pragma pack(pop)
 
 struct ConstTunnelFrameBuffer {
@@ -71,6 +87,11 @@ class TunnelFrameReader {
 public:
     TunnelFrameReader(const ConstTunnelFrameBuffer &buf);
     TunnelFrameReader(const TunnelFrameBuffer &buf);
+
+    /**
+     * Performs just a cursory check that the passed in buffer contains a valid tunnel frame header.
+     */
+    static const TunnelFrameHeader &checkHeader(const ConstTunnelFrameBuffer &buf);
 
     /**
      * Provides direct access to the header of the frame and is available at any time, regardless of

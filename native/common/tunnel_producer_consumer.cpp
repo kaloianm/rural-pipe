@@ -146,7 +146,7 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
 
                 BOOST_LOG_TRIVIAL(debug)
                     << "Waiting for datagrams from file descriptor " << tunnelFd << " ("
-                    << numDatagramsWritten << " received so far)";
+                    << numDatagramsWritten << " datagrams received so far)";
 
                 pollfd fd;
                 fd.fd = tunnelFd;

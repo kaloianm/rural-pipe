@@ -40,15 +40,29 @@ public:
 
 } // namespace
 
+constexpr char TunnelFrameHeader::kMagic[3];
+
 TunnelFrameReader::TunnelFrameReader(const ConstTunnelFrameBuffer &buf)
     : _begin(buf.data), _current(_begin), _end(_begin + buf.size) {
-    const auto &hdr = header();
-    if (hdr.desc.version != kVersion)
-        throw Exception(boost::format("Unrecognised tunnel frame version %1%") % hdr.desc.version);
+    checkHeader(buf);
 }
 
 TunnelFrameReader::TunnelFrameReader(const TunnelFrameBuffer &buf)
     : TunnelFrameReader(ConstTunnelFrameBuffer{buf.data, buf.size}) {}
+
+const TunnelFrameHeader &TunnelFrameReader::checkHeader(const ConstTunnelFrameBuffer &buf) {
+    if (buf.size < sizeof(TunnelFrameHeader))
+        throw Exception(boost::format("Invalid tunnel frame header size %1%") % buf.size);
+
+    const auto &hdr = *((TunnelFrameHeader const *)buf.data);
+    if (memcmp(hdr.magic, TunnelFrameHeader::kMagic, sizeof(TunnelFrameHeader::kMagic) != 0))
+        throw Exception(boost::format("Unrecognised tunnel frame magic number %1%") % hdr.magic);
+    if (hdr.desc.version != kVersion)
+        throw Exception(boost::format("Unrecognised tunnel frame version %1%") % hdr.desc.version);
+    // TODO: Check the rest of the fields
+
+    return hdr;
+}
 
 bool TunnelFrameReader::next() {
     if (_current == _begin)
@@ -61,6 +75,8 @@ bool TunnelFrameReader::next() {
 
 TunnelFrameWriter::TunnelFrameWriter(const TunnelFrameBuffer &buf)
     : _begin(buf.data), _current(_begin + sizeof(TunnelFrameHeader)), _end(_begin + buf.size) {
+    memcpy(header().magic, TunnelFrameHeader::kMagic, sizeof(TunnelFrameHeader::kMagic));
+    header().desc.version = kVersion;
     header().desc.size = 0;
 }
 
@@ -73,11 +89,8 @@ void TunnelFrameWriter::close() {
     onDatagramWritten(0);
 
     auto &hdr = *((TunnelFrameHeader *)_begin);
-    hdr.desc.version = kVersion;
     hdr.desc.flags = 0;
     hdr.desc.size = _current - _begin;
-    // TODO: Properly populate the signature field
-    strcpy((char *)&hdr.signature, "---- RURAL PIPE SIGNATURE ----");
 }
 
 void TunnelFrameWriter::appendBytes(uint8_t const *ptr, size_t size) {

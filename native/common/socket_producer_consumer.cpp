@@ -168,15 +168,15 @@ void TunnelFrameStream::send(TunnelFrameBuffer buf) {
 }
 
 TunnelFrameBuffer TunnelFrameStream::receive() {
-    int numRead = _fd.read((void *)_buffer, sizeof(TunnelFrameHeader));
+    size_t numRead = _fd.read((void *)_buffer, sizeof(TunnelFrameHeader));
 
-    uint64_t seqNum = ((TunnelFrameHeader *)_buffer)->seqNum;
-    size_t totalSize = ((TunnelFrameHeader *)_buffer)->desc.size;
-    BOOST_LOG_TRIVIAL(debug) << "Received the header of frame " << seqNum << " (" << totalSize
+    const auto &hdr = TunnelFrameReader::checkHeader({_buffer, numRead});
+    const size_t totalSize = hdr.desc.size;
+    BOOST_LOG_TRIVIAL(debug) << "Received header of frame " << hdr.seqNum << " (" << totalSize
                              << " bytes)";
 
     while (numRead < totalSize) {
-        numRead += read(_fd, (void *)&_buffer[numRead], totalSize - numRead);
+        numRead += _fd.read((void *)&_buffer[numRead], totalSize - numRead);
 
         BOOST_LOG_TRIVIAL(debug) << "Received " << numRead << " bytes so far";
     }
