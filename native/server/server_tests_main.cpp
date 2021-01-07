@@ -204,7 +204,7 @@ void tunnelProducerConsumerTests() {
     CHECK(pipes[1].fd.write(DATA_AND_SIZE("DG2.1")) > 0);
 
     while (testPipe.getNumFramesReceived() < 2)
-        sleep(1);
+        ::sleep(1);
 
     LOG << "Parsing the last received tunnel frame";
 

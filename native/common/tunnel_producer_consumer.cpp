@@ -193,7 +193,7 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
             } catch (const NotYetReadyException &ex) {
                 BOOST_LOG_TRIVIAL(debug)
                     << "Client/server not yet ready: " << ex.what() << "; retrying ...";
-                sleep(5);
+                ::sleep(5);
             }
         }
     }
