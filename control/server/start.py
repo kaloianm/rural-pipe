@@ -36,10 +36,10 @@ async def start_server_and_wait(options):
 
     if not os.path.exists('/tmp/server'):
         os.mkfifo('/tmp/server', mode=0o666)
-    server_process = await asyncio.create_subprocess_exec(os.path.join(sys.path[0], 'server'),
-                                                          stdin=asyncio.subprocess.PIPE,
-                                                          stdout=asyncio.subprocess.PIPE,
-                                                          stderr=asyncio.subprocess.STDOUT)
+
+    server_process = await asyncio.create_subprocess_exec(
+        os.path.join(sys.path[0], 'server'), stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
     first_line = await server_process.stdout.readline()
     if not first_line.decode().startswith('Rural Pipe server running'):
         print('Received unexpected response from the process:', first_line.decode())
@@ -52,6 +52,22 @@ async def start_server_and_wait(options):
 
     print('Server started and active, configuring routing ...')
 
+    # Check if NAT is enabled for the server's WAN interface so that packets can flow
+    ipcmd = await asyncio.create_subprocess_shell(
+        'iptables -C POSTROUTING -t nat -o {} -j MASQUERADE'.format(options.wan_interface))
+    try:
+        if await ipcmd.wait() > 0:
+            raise Exception({
+                'NAT is not configured. Please run: sudo iptables -A POSTROUTING -t nat -o {} -j MASQUERADE'
+            }.format(options.wan_interface))
+    except:
+        try:
+            server_process.kill()
+        except:
+            pass
+        return await server_process.wait()
+
+    # Configure the IP address of the interface
     ipcmd = await asyncio.create_subprocess_shell('ip link set rpis up')
     await ipcmd.wait()
     ipcmd = await asyncio.create_subprocess_shell('ip addr add ' + str(ip_iface) + ' dev rpis')
