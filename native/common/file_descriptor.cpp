@@ -65,8 +65,9 @@ ScopedFileDescriptor::~ScopedFileDescriptor() {
         BOOST_LOG_TRIVIAL(debug) << boost::format("File descriptor closed (%d): %s") % _fd % _desc;
 
         if (close(_fd) < 0) {
-            BOOST_LOG_TRIVIAL(debug) << "Failed to close file descriptor " << _fd << " (" << _desc
-                                     << "): " << SystemException::getLastError();
+            BOOST_LOG_TRIVIAL(debug)
+                << (boost::format("File descriptor close failed (%d): %s") % _fd % _desc) << ": "
+                << SystemException::getLastError();
         }
 
         return;

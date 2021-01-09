@@ -65,7 +65,7 @@ private:
  */
 class SocketProducerConsumer : public TunnelFramePipe {
 public:
-    SocketProducerConsumer(bool isClient, TunnelFramePipe &pipe);
+    SocketProducerConsumer(bool isClient, TunnelFramePipe &prev);
     ~SocketProducerConsumer();
 
     struct SocketConfig {

@@ -79,7 +79,7 @@ ContextBase::ShouldStart ContextBase::start(int argc, const char *argv[],
                               logging::keywords::auto_flush = true,
                               logging::keywords::format = "[%TimeStamp% (%Scope%)]: %Message%");
 
-        logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::info);
+        logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
     } else {
         logging::add_console_log(std::cout, boost::log::keywords::format =
                                                 "[%TimeStamp% (%Scope%)] %Message%");

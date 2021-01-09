@@ -183,18 +183,26 @@ public:
      */
     virtual void onTunnelFrameReady(TunnelFrameBuffer buf) = 0;
 
-    void pipeInvoke(TunnelFrameBuffer buf);
+    /**
+     * Invoke the `onTunnelFrameReady` method of the previous or next pipe in the chain.
+     */
+    void pipeInvokePrev(TunnelFrameBuffer buf);
+    void pipeInvokeNext(TunnelFrameBuffer buf);
 
 protected:
-    TunnelFramePipe();
-    TunnelFramePipe(TunnelFramePipe *pipe);
+    TunnelFramePipe(std::string desc);
+    TunnelFramePipe(std::string desc, TunnelFramePipe *prev, TunnelFramePipe *next);
 
-    void pipeAttach(TunnelFramePipe &pipe);
-    void pipeDetach();
+    void pipePush(TunnelFramePipe &prev);
+    void pipePop();
 
 private:
+    const std::string _desc;
+
     std::mutex _mutex;
-    TunnelFramePipe *_pipe;
+
+    TunnelFramePipe *_prev;
+    TunnelFramePipe *_next;
 };
 
 } // namespace ruralpi

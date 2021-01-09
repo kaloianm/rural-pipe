@@ -32,8 +32,9 @@ public:
     int read(void *buf, size_t nbytes);
     int write(void const *buf, size_t size);
 
-    const auto &desc() const { return _desc; }
     operator int() const { return _fd; }
+
+    const auto &desc() const { return _desc; }
 
 protected:
     FileDescriptor();

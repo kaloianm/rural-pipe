@@ -30,7 +30,7 @@ const uint8_t kVersion = 1;
 
 class NotYetReadyTunnelFramePipe : public TunnelFramePipe {
 public:
-    NotYetReadyTunnelFramePipe() : TunnelFramePipe(nullptr) {}
+    NotYetReadyTunnelFramePipe() : TunnelFramePipe("NotYetReady", nullptr, nullptr) {}
 
     void onTunnelFrameReady(TunnelFrameBuffer buf) {
         throw NotYetReadyException("Received frame before the pipe was configured");
@@ -122,32 +122,44 @@ void TunnelFrameWriter::append(const std::string &str) {
     append((uint8_t const *)str.c_str(), str.size());
 }
 
-TunnelFramePipe::TunnelFramePipe() : TunnelFramePipe(&kNotYetReadyTunnelFramePipe) {}
-
-TunnelFramePipe::TunnelFramePipe(TunnelFramePipe *pipe) : _pipe(pipe) {}
-
-void TunnelFramePipe::pipeInvoke(TunnelFrameBuffer buf) {
-    std::lock_guard<std::mutex> lg(_pipe->_mutex);
-    _pipe->onTunnelFrameReady(buf);
+TunnelFramePipe::TunnelFramePipe(std::string desc)
+    : TunnelFramePipe(std::move(desc), &kNotYetReadyTunnelFramePipe, &kNotYetReadyTunnelFramePipe) {
 }
 
-void TunnelFramePipe::pipeAttach(TunnelFramePipe &pipe) {
-    std::lock_guard<std::mutex> lgThis(_mutex);
-    std::lock_guard<std::mutex> lgOther(pipe._mutex);
+TunnelFramePipe::TunnelFramePipe(std::string desc, TunnelFramePipe *prev, TunnelFramePipe *next)
+    : _desc(std::move(desc)), _prev(prev), _next(next) {}
 
-    BOOST_ASSERT(_pipe == &kNotYetReadyTunnelFramePipe);
-    BOOST_ASSERT(pipe._pipe == &kNotYetReadyTunnelFramePipe);
-
-    _pipe = &pipe;
-    pipe._pipe = this;
+void TunnelFramePipe::pipeInvokePrev(TunnelFrameBuffer buf) {
+    std::lock_guard<std::mutex> lg(_prev->_mutex);
+    _prev->onTunnelFrameReady(buf);
 }
 
-void TunnelFramePipe::pipeDetach() {
-    std::lock_guard<std::mutex> lgThis(_mutex);
-    std::lock_guard<std::mutex> lgOther(_pipe->_mutex);
+void TunnelFramePipe::pipeInvokeNext(TunnelFrameBuffer buf) {
+    std::lock_guard<std::mutex> lg(_next->_mutex);
+    _next->onTunnelFrameReady(buf);
+}
 
-    _pipe->_pipe = &kNotYetReadyTunnelFramePipe;
-    _pipe = &kNotYetReadyTunnelFramePipe;
+void TunnelFramePipe::pipePush(TunnelFramePipe &prev) {
+    std::lock_guard<std::mutex> lgThis(_mutex);
+    BOOST_ASSERT(_prev == &kNotYetReadyTunnelFramePipe);
+    BOOST_ASSERT(_next == &kNotYetReadyTunnelFramePipe);
+
+    std::lock_guard<std::mutex> lgPrev(prev._mutex);
+    BOOST_ASSERT(prev._next == &kNotYetReadyTunnelFramePipe);
+
+    _prev = &prev;
+    prev._next = this;
+}
+
+void TunnelFramePipe::pipePop() {
+    std::lock_guard<std::mutex> lgThis(_mutex);
+    BOOST_ASSERT(_next == &kNotYetReadyTunnelFramePipe);
+
+    std::lock_guard<std::mutex> lgPrev(_prev->_mutex);
+    BOOST_ASSERT(_prev->_next == this);
+
+    _prev->_next = &kNotYetReadyTunnelFramePipe;
+    _prev = &kNotYetReadyTunnelFramePipe;
 }
 
 } // namespace ruralpi

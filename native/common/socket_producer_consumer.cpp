@@ -77,9 +77,9 @@ InitalExchangeResult initialTunnelFrameExchange(TunnelFrameStream &stream, bool 
 
 } // namespace
 
-SocketProducerConsumer::SocketProducerConsumer(bool isClient, TunnelFramePipe &pipe)
-    : _isClient(isClient) {
-    pipeAttach(pipe);
+SocketProducerConsumer::SocketProducerConsumer(bool isClient, TunnelFramePipe &prev)
+    : TunnelFramePipe("Socket"), _isClient(isClient) {
+    pipePush(prev);
     BOOST_LOG_TRIVIAL(info) << "Socket producer/consumer started";
 }
 
@@ -87,7 +87,9 @@ SocketProducerConsumer::~SocketProducerConsumer() {
     _interrupted.store(true);
     _pool.join();
 
-    pipeDetach();
+    BOOST_ASSERT(_streams.empty());
+
+    pipePop();
     BOOST_LOG_TRIVIAL(info) << "Socket producer/consumer finished";
 }
 
@@ -152,7 +154,7 @@ void SocketProducerConsumer::_receiveFromSocketLoop(TunnelFrameStream &stream) {
         auto buf = stream.receive();
         while (true) {
             try {
-                pipeInvoke(buf);
+                pipeInvokePrev(buf);
                 break;
             } catch (const NotYetReadyException &ex) {
                 BOOST_LOG_TRIVIAL(debug)
@@ -173,7 +175,7 @@ void TunnelFrameStream::send(TunnelFrameBuffer buf) {
         numWritten += _fd.write((void const *)buf.data, buf.size);
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "Sent frame of " << numWritten << " bytes";
+    BOOST_LOG_TRIVIAL(trace) << "Sent frame of " << numWritten << " bytes";
 }
 
 TunnelFrameBuffer TunnelFrameStream::receive() {
@@ -185,7 +187,7 @@ TunnelFrameBuffer TunnelFrameStream::receive() {
 
     const auto &hdrInfo = TunnelFrameHeaderInfo::check({_buffer, numRead});
     const size_t totalSize = hdrInfo.desc.size;
-    BOOST_LOG_TRIVIAL(debug) << "Received header of frame of size " << hdrInfo.desc.size
+    BOOST_LOG_TRIVIAL(trace) << "Received header of frame of size " << hdrInfo.desc.size
                              << " bytes";
 
     while (numRead < totalSize) {

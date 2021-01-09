@@ -176,8 +176,11 @@ void tunnelProducerConsumerTests() {
     TunnelProducerConsumer tunnelPC(std::vector<FileDescriptor>{pipes[0].fd, pipes[1].fd}, 1500);
 
     struct TestPipe : public TunnelFramePipe {
-        TestPipe(TunnelFramePipe &pipe) { pipeAttach(pipe); }
-        ~TestPipe() { pipeDetach(); }
+        TestPipe(TunnelFramePipe &prev) : TunnelFramePipe("tunnelProducerConsumerTests") {
+            pipePush(prev);
+        }
+
+        ~TestPipe() { pipePop(); }
 
         void onTunnelFrameReady(TunnelFrameBuffer buf) override {
             LOG << "Received tunnel frame of " << buf.size << " bytes";
@@ -214,13 +217,15 @@ void tunnelProducerConsumerTests() {
     LOG << (char *)reader.data();
     CHECK(!reader.next());
 
-    testPipe.pipeInvoke({testPipe.lastFrameReceived, testPipe.lastFrameReceivedSize});
+    testPipe.pipeInvokePrev({testPipe.lastFrameReceived, testPipe.lastFrameReceivedSize});
 }
 
 void socketProducerConsumerTests() {
     TestFifo pipes[2];
 
     struct TestPipe : public TunnelFramePipe {
+        TestPipe() : TunnelFramePipe("socketProducerConsumerTests") {}
+
         void onTunnelFrameReady(TunnelFrameBuffer buf) override {}
     } testPipe;
 

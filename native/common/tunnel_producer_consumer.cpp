@@ -34,7 +34,7 @@ namespace {
 
 using Milliseconds = std::chrono::milliseconds;
 
-const std::chrono::seconds kWaitForData(30);
+const std::chrono::seconds kWaitForData(5);
 const std::chrono::milliseconds kWaitForBatch(5);
 
 std::string debugLogDatagram(uint8_t const *data, size_t size) {
@@ -65,7 +65,7 @@ std::string debugLogDatagram(uint8_t const *data, size_t size) {
 } // namespace
 
 TunnelProducerConsumer::TunnelProducerConsumer(std::vector<FileDescriptor> tunnelFds, int mtu)
-    : _tunnelFds(std::move(tunnelFds)), _mtu(mtu) {
+    : TunnelFramePipe("Tunnel"), _tunnelFds(std::move(tunnelFds)), _mtu(mtu) {
     for (auto &fd : _tunnelFds) {
         BOOST_LOG_TRIVIAL(info) << "Starting thread for tunnel file descriptor " << fd;
 
@@ -105,7 +105,7 @@ void TunnelProducerConsumer::onTunnelFrameReady(TunnelFrameBuffer buf) {
         const auto &ip = IP::read(reader.data());
         auto &tunnelFd = _tunnelFds[(ip.saddr + ip.daddr) % _tunnelFds.size()];
         int numWritten = tunnelFd.write(reader.data(), reader.size());
-        BOOST_LOG_TRIVIAL(debug) << "Wrote " << numWritten << " byte datagram to tunnel socket "
+        BOOST_LOG_TRIVIAL(trace) << "Wrote " << numWritten << " byte datagram to tunnel socket "
                                  << tunnelFd << ": "
                                  << debugLogDatagram(reader.data(), reader.size());
     }
@@ -137,14 +137,14 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
                     break;
                 }
 
-                BOOST_LOG_TRIVIAL(debug)
+                BOOST_LOG_TRIVIAL(trace)
                     << "Waiting for datagrams from file descriptor " << tunnelFd << " ("
                     << numDatagramsWritten << " datagrams received so far)";
 
                 pollfd fd;
                 fd.fd = tunnelFd;
                 fd.events = POLLIN;
-                res = SYSCALL(poll(
+                res = SYSCALL(::poll(
                     &fd, 1,
                     (numDatagramsWritten ? Milliseconds(kWaitForBatch) : Milliseconds(kWaitForData))
                         .count()));
@@ -174,7 +174,7 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
             }
 
             memcpy(writer.data(), mtuBuffer, mtuBufferSize);
-            BOOST_LOG_TRIVIAL(debug)
+            BOOST_LOG_TRIVIAL(trace)
                 << "Received " << mtuBufferSize << " byte datagram from tunnel socket " << tunnelFd
                 << ": " << debugLogDatagram(writer.data(), mtuBufferSize);
             writer.onDatagramWritten(mtuBufferSize);
@@ -188,11 +188,11 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
 
         while (true) {
             try {
-                pipeInvoke(writer.buffer());
+                pipeInvokeNext(writer.buffer());
                 break;
             } catch (const NotYetReadyException &ex) {
                 BOOST_LOG_TRIVIAL(debug)
-                    << "Client/server not yet ready: " << ex.what() << "; retrying ...";
+                    << "Socket not yet ready: " << ex.what() << "; retrying ...";
                 ::sleep(5);
             }
         }
