@@ -20,30 +20,48 @@
 
 #include <fcntl.h>
 #include <string>
+#include <chrono>
 #include <sys/stat.h>
 #include <sys/types.h>
 
 namespace ruralpi {
 
+/**
+ * Wrapper around a file descriptor, which exposes the generic system calls as a set of
+ * SystemException-throwing methods. The class doesn't own the file descriptor (meaning that it
+ * won't close it at destruction time for example).
+ *
+ * This object is both movable and copiable, but care must be take with multiple copies, because the
+ * underlying file descriptor can be closed at any time by any of the other owners.
+ */
 class FileDescriptor {
 public:
     FileDescriptor(const std::string &desc, int fd);
 
+    FileDescriptor(const FileDescriptor &);
+    FileDescriptor(FileDescriptor &&);
+
     int read(void *buf, size_t nbytes);
     int write(void const *buf, size_t size);
 
+    int poll(std::chrono::milliseconds timeout);
+
     operator int() const { return _fd; }
 
-    const auto &desc() const { return _desc; }
+    const std::string &toString() const { return _desc; }
 
 protected:
-    FileDescriptor();
-
     // Description used for debugging and diagnostics purposes
     std::string _desc;
+
+    // The file descriptor that is being wrapped
     int _fd{-1};
 };
 
+/**
+ * Extension of `FileDescriptor` above, which actually owns the passed-in file descriptor and closes
+ * it at destruction time. This object is only movable, but not copiable.
+ */
 class ScopedFileDescriptor : public FileDescriptor {
 public:
     ScopedFileDescriptor(const std::string &desc, int fd);

@@ -20,8 +20,10 @@
 
 #include <atomic>
 #include <boost/asio/thread_pool.hpp>
+#include <boost/functional/hash.hpp>
 #include <list>
 #include <mutex>
+#include <unordered_map>
 
 #include "common/file_descriptor.h"
 #include "common/tunnel_frame.h"
@@ -37,6 +39,7 @@ public:
     // An established file descriptor, whose lifetime is owned by the tunnel frame stream after
     // construction
     TunnelFrameStream(ScopedFileDescriptor fd);
+    TunnelFrameStream(TunnelFrameStream &&);
     ~TunnelFrameStream();
 
     /**
@@ -51,7 +54,7 @@ public:
      */
     TunnelFrameBuffer receive();
 
-    const auto &desc() const { return _fd.desc(); }
+    std::string toString() const { return _fd.toString(); }
 
 private:
     ScopedFileDescriptor _fd;
@@ -78,10 +81,26 @@ private:
     void onTunnelFrameReady(TunnelFrameBuffer buf) override;
 
     /**
+     * Encapsulates the entire runtime state of a session between a client and server.
+     */
+    struct Session {
+        Session(SessionId sessionId);
+
+        Session(const Session &) = delete;
+        Session(Session &&) = delete;
+
+        const SessionId sessionId;
+
+        std::mutex mutex;
+        std::list<TunnelFrameStream> streams;
+    };
+    using SessionsMap = std::unordered_map<SessionId, Session, boost::hash<SessionId>>;
+
+    /**
      * Runs on a thread per socket file descriptor passed through call to `addSocket`. Receives
      * incoming tunnel frames and passes them on to the upstream tunnel producer/consumer.
      */
-    void _receiveFromSocketLoop(TunnelFrameStream &stream);
+    void _receiveFromSocketLoop(Session &session, TunnelFrameStream &stream);
 
     // Indicates whether this socket is run as a client or server
     const bool _isClient;
@@ -96,7 +115,7 @@ private:
     std::atomic<bool> _interrupted{false};
 
     // Set of streams to the connected clients or server
-    std::list<TunnelFrameStream> _streams;
+    SessionsMap _sessions;
 };
 
 } // namespace ruralpi

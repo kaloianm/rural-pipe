@@ -23,8 +23,6 @@
 #include <boost/log/trivial.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
-#include <chrono>
-#include <poll.h>
 
 #include "common/exception.h"
 
@@ -33,17 +31,19 @@ namespace {
 
 boost::uuids::basic_random_generator<boost::mt19937> uuidGen;
 
-struct InitalExchangeResult {
+struct InitialExchangeResult {
     std::string identifier;
-    boost::uuids::uuid sessionId;
+    SessionId sessionId;
 };
 
-InitalExchangeResult initialTunnelFrameExchange(TunnelFrameStream &stream, bool isClient) {
+InitialExchangeResult initialTunnelFrameExchange(TunnelFrameStream &stream, bool isClient) {
     uint8_t buffer[1024];
     memset(buffer, 0xAA, sizeof(buffer));
 
     if (isClient) {
         TunnelFrameWriter writer({buffer, sizeof(buffer)});
+
+        // The client generates the session, the server just accepts it
         writer.header().sessionId = uuidGen();
         writer.header().seqNum = TunnelFrameHeader::kInitialSeqNum;
         strcpy(((char *)((InitTunnelFrame *)writer.data())->identifier), "RuralPipeClient");
@@ -87,7 +87,7 @@ SocketProducerConsumer::~SocketProducerConsumer() {
     _interrupted.store(true);
     _pool.join();
 
-    BOOST_ASSERT(_streams.empty());
+    BOOST_ASSERT(_sessions.empty());
 
     pipePop();
     BOOST_LOG_TRIVIAL(info) << "Socket producer/consumer finished";
@@ -101,35 +101,61 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
     }();
 
     if (!isSocket)
-        BOOST_LOG_TRIVIAL(warning) << "File descriptor " << config.fd << " is not a socket";
+        BOOST_LOG_TRIVIAL(warning)
+            << "File descriptor " << config.fd.toString() << " is not a socket";
 
-    BOOST_LOG_TRIVIAL(info) << "Starting thread for socket file descriptor " << config.fd;
+    BOOST_LOG_TRIVIAL(info) << "Starting thread for socket file descriptor "
+                            << config.fd.toString();
 
-    std::lock_guard<std::mutex> lg(_mutex);
-
-    boost::asio::post([this, it = _streams.emplace(_streams.end(), std::move(config.fd))] {
+    boost::asio::post([this, config = std::move(config)]() mutable {
         BOOST_LOG_NAMED_SCOPE("_receiveFromSocketLoop");
 
-        ScopedGuard sg([this, it] {
-            std::lock_guard<std::mutex> lg(_mutex);
-            _streams.erase(it);
-        });
+        TunnelFrameStream s(std::move(config.fd));
+        InitialExchangeResult ier;
 
-        auto &stream = [&]() -> auto & {
-            std::lock_guard<std::mutex> lg(_mutex);
-            return *it;
+        try {
+            ier = initialTunnelFrameExchange(s, _isClient);
+            BOOST_LOG_TRIVIAL(info) << "Initial exchange with " << ier.identifier << " : "
+                                    << ier.sessionId << " successful";
+        } catch (const std::exception &ex) {
+            BOOST_LOG_TRIVIAL(info)
+                << "Initial exchange with " << s.toString() << " failed due to: " << ex.what();
+            return;
+        }
+
+        std::unique_lock<std::mutex> ul(_mutex);
+
+        auto &session = [&]() -> auto & {
+            auto it = _sessions.find(ier.sessionId);
+            if (it == _sessions.end())
+                it = _sessions.emplace(ier.sessionId, ier.sessionId).first;
+            return it->second;
         }
         ();
 
-        try {
-            _receiveFromSocketLoop(stream);
+        auto it = session.streams.emplace(session.streams.end(), std::move(s));
 
-            BOOST_LOG_TRIVIAL(info) << "Thread for socket " << stream.desc()
+        ScopedGuard sg([this, sessionId = ier.sessionId, itStream = it] {
+            std::lock_guard<std::mutex> lg(_mutex);
+            auto it = _sessions.find(sessionId);
+            it->second.streams.erase(itStream);
+            if (it->second.streams.empty())
+                _sessions.erase(it);
+        });
+
+        auto &stream = *it;
+
+        ul.unlock();
+
+        try {
+            _receiveFromSocketLoop(session, stream);
+
+            BOOST_LOG_TRIVIAL(info) << "Thread for socket " << stream.toString()
                                     << " exited normally. This should never be reached.";
             BOOST_ASSERT(false);
         } catch (const std::exception &ex) {
             BOOST_LOG_TRIVIAL(info)
-                << "Thread for socket " << stream.desc() << " completed due to " << ex.what();
+                << "Thread for socket " << stream.toString() << " completed due to " << ex.what();
         }
     });
 }
@@ -137,22 +163,27 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
 void SocketProducerConsumer::onTunnelFrameReady(TunnelFrameBuffer buf) {
     std::lock_guard<std::mutex> lg(_mutex);
 
-    if (_streams.empty())
+    if (_sessions.empty())
         throw NotYetReadyException("The other side of the tunnel is not connected yet");
 
     // TODO: Choose a client/server connection to send it on based on some bandwidth requirements
-    // metric
-    _streams.front().send(buf);
+    // metric, etc.
+    _sessions.begin()->second.streams.front().send(buf);
 }
 
-void SocketProducerConsumer::_receiveFromSocketLoop(TunnelFrameStream &stream) {
-    auto ifr = initialTunnelFrameExchange(stream, _isClient);
-    BOOST_LOG_TRIVIAL(info) << "Initial exchange with " << ifr.identifier << ":" << ifr.sessionId
-                            << " successful";
+void SocketProducerConsumer::_receiveFromSocketLoop(Session &session, TunnelFrameStream &stream) {
+    while (true) {
+        if (_interrupted.load()) {
+            throw Exception("Interrupted");
+        }
 
-    while (!_interrupted.load()) {
         auto buf = stream.receive();
+
         while (true) {
+            if (_interrupted.load()) {
+                throw Exception("Interrupted");
+            }
+
             try {
                 pipeInvokePrev(buf);
                 break;
@@ -165,7 +196,11 @@ void SocketProducerConsumer::_receiveFromSocketLoop(TunnelFrameStream &stream) {
     }
 }
 
+SocketProducerConsumer::Session::Session(SessionId sessionId) : sessionId(std::move(sessionId)) {}
+
 TunnelFrameStream::TunnelFrameStream(ScopedFileDescriptor fd) : _fd(std::move(fd)) {}
+
+TunnelFrameStream::TunnelFrameStream(TunnelFrameStream &&) = default;
 
 TunnelFrameStream::~TunnelFrameStream() = default;
 

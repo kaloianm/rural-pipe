@@ -19,6 +19,8 @@
 #include "common/file_descriptor.h"
 
 #include <boost/log/trivial.hpp>
+#include <poll.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 
 #include "common/exception.h"
@@ -29,7 +31,16 @@ FileDescriptor::FileDescriptor(const std::string &desc, int fd) : _desc(desc), _
     SYSCALL_MSG(_fd, boost::format("Could not open file descriptor (%d): %s") % _fd % _desc);
 }
 
-FileDescriptor::FileDescriptor() = default;
+FileDescriptor::FileDescriptor(const FileDescriptor &) = default;
+
+FileDescriptor::FileDescriptor(FileDescriptor &&other) {
+    if (&other == this)
+        return;
+
+    _desc = std::move(other._desc);
+    _fd = other._fd;
+    other._fd = -1;
+}
 
 int FileDescriptor::read(void *buf, size_t nbytes) {
     int res =
@@ -46,19 +57,19 @@ int FileDescriptor::write(void const *buf, size_t size) {
                        boost::format("Failed to write on file descriptor (%d): %s") % _fd % _desc);
 }
 
+int FileDescriptor::poll(std::chrono::milliseconds timeout) {
+    pollfd fd;
+    fd.fd = _fd;
+    fd.events = POLLIN;
+    return SYSCALL(::poll(&fd, 1, timeout.count()));
+}
+
 ScopedFileDescriptor::ScopedFileDescriptor(const std::string &desc, int fd)
     : FileDescriptor(desc, fd) {
     BOOST_LOG_TRIVIAL(debug) << boost::format("File descriptor created (%d): %s") % _fd % _desc;
 }
 
-ScopedFileDescriptor::ScopedFileDescriptor(ScopedFileDescriptor &&other) {
-    if (&other == this)
-        return;
-
-    _desc = std::move(other._desc);
-    _fd = other._fd;
-    other._fd = -1;
-}
+ScopedFileDescriptor::ScopedFileDescriptor(ScopedFileDescriptor &&other) = default;
 
 ScopedFileDescriptor::~ScopedFileDescriptor() {
     if (_fd > 0) {

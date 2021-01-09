@@ -221,8 +221,6 @@ void tunnelProducerConsumerTests() {
 }
 
 void socketProducerConsumerTests() {
-    TestFifo pipes[2];
-
     struct TestPipe : public TunnelFramePipe {
         TestPipe() : TunnelFramePipe("socketProducerConsumerTests") {}
 
@@ -230,6 +228,9 @@ void socketProducerConsumerTests() {
     } testPipe;
 
     SocketProducerConsumer socketPC(true /* isClient */, testPipe);
+
+    TestFifo pipe;
+    socketPC.addSocket(SocketProducerConsumer::SocketConfig{std::move(pipe.fd)});
 }
 
 void serverTestsMain() {

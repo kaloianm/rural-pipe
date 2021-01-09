@@ -21,10 +21,7 @@
 #include <boost/asio.hpp>
 #include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/trivial.hpp>
-#include <chrono>
-#include <poll.h>
 #include <sstream>
-#include <sys/ioctl.h>
 
 #include "common/exception.h"
 #include "common/ip_parsers.h"
@@ -77,11 +74,11 @@ TunnelProducerConsumer::TunnelProducerConsumer(std::vector<FileDescriptor> tunne
             try {
                 _receiveFromTunnelLoop(fd);
 
-                BOOST_LOG_TRIVIAL(info) << "Thread for tunnel device " << fd.desc()
+                BOOST_LOG_TRIVIAL(info) << "Thread for tunnel device " << fd.toString()
                                         << " exited normally. This should never be reached.";
                 BOOST_ASSERT(false);
             } catch (const std::exception &ex) {
-                BOOST_LOG_TRIVIAL(info) << "Thread for tunnel device " << fd.desc()
+                BOOST_LOG_TRIVIAL(info) << "Thread for tunnel device " << fd.toString()
                                         << " completed due to " << ex.what();
             }
         });
@@ -141,13 +138,8 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
                     << "Waiting for datagrams from file descriptor " << tunnelFd << " ("
                     << numDatagramsWritten << " datagrams received so far)";
 
-                pollfd fd;
-                fd.fd = tunnelFd;
-                fd.events = POLLIN;
-                res = SYSCALL(::poll(
-                    &fd, 1,
-                    (numDatagramsWritten ? Milliseconds(kWaitForBatch) : Milliseconds(kWaitForData))
-                        .count()));
+                res = tunnelFd.poll(numDatagramsWritten ? Milliseconds(kWaitForBatch)
+                                                        : Milliseconds(kWaitForData));
                 if (res > 0)
                     break;
                 if (numDatagramsWritten) // res == 0
@@ -187,6 +179,10 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
         writer.close();
 
         while (true) {
+            if (_interrupted.load()) {
+                throw Exception("Interrupted");
+            }
+
             try {
                 pipeInvokeNext(writer.buffer());
                 break;

@@ -25,6 +25,8 @@
 
 namespace ruralpi {
 
+using SessionId = boost::uuids::uuid;
+
 struct ConstTunnelFrameBuffer {
     uint8_t const *data;
     size_t size;
@@ -41,9 +43,11 @@ struct TunnelFrameBuffer {
 struct TunnelFrameHeaderInfo {
     static constexpr char kMagic[3] = {'R', 'P', 'I'};
 
-    // Fix magic value to differentiate the start of each tunnel frame (always set to `kMagic`)
+    // Fixed magic value to differentiate the start of each tunnel frame (must always be populated
+    // with the contents of `kMagic`)
     char magic[3];
 
+    // Controls how the rest of the frame should be interpreted
     struct Desc {
         uint8_t version : 2;
         uint8_t flags : 6;
@@ -59,7 +63,7 @@ struct TunnelFrameHeader : public TunnelFrameHeaderInfo {
     static constexpr uint64_t kInitialSeqNum = 0;
 
     // For which session does this frame apply
-    boost::uuids::uuid sessionId;
+    SessionId sessionId;
 
     // Sequence number from the point of view of the sender of the frame. I.e., both client and
     // server send their own sequence numbers which need to be consecutive
@@ -68,6 +72,13 @@ struct TunnelFrameHeader : public TunnelFrameHeaderInfo {
     // Cryptographic signature of all the contents of the frame, which follow after this field (up
     // to `desc.size`)
     char signature[128];
+
+    static const TunnelFrameHeader &cast(const ConstTunnelFrameBuffer &buf) {
+        return *((TunnelFrameHeader const *)buf.data);
+    }
+    static TunnelFrameHeader &cast(const TunnelFrameBuffer &buf) {
+        return *((TunnelFrameHeader *)buf.data);
+    }
 };
 BOOST_STATIC_ASSERT(sizeof(TunnelFrameHeader) == 158);
 
@@ -84,6 +95,7 @@ constexpr size_t kTunnelFrameMaxSize = 4096;
 // The first tunnel frame exchanged between client and server (seqNum 0) contains a single
 // "datagram" with this structure
 struct InitTunnelFrame {
+    // Contains a user-friendly descriptor of the side, which sends this frame
     char identifier[16];
 };
 BOOST_STATIC_ASSERT(sizeof(InitTunnelFrame) == 16);
@@ -99,7 +111,7 @@ public:
      * Provides direct access to the header of the frame and is available at any time, regardless of
      * whether the current pointer of the reader is located or whether there are any datagrams.
      */
-    const TunnelFrameHeader &header() const { return *((TunnelFrameHeader *)_begin); }
+    const TunnelFrameHeader &header() const { return *((TunnelFrameHeader const *)_begin); }
     ConstTunnelFrameBuffer buffer() const { return {_begin, header().desc.size}; }
 
     /**
@@ -108,8 +120,13 @@ public:
      */
     bool next();
 
+    /**
+     * Returns the pointer where the current cursor (set by `next`) is pointing to and the size of
+     * the datagram. This method is only safe to call if a previous call to `next()` has returned
+     * true.
+     */
     uint8_t const *data() const { return _current + sizeof(TunnelFrameDatagramSeparator); }
-    size_t size() const { return ((TunnelFrameDatagramSeparator *)_current)->size; }
+    size_t size() const { return ((TunnelFrameDatagramSeparator const *)_current)->size; }
 
 private:
     uint8_t const *const _begin;
@@ -152,8 +169,8 @@ public:
     TunnelFrameBuffer buffer() const { return {_begin, header().desc.size}; }
 
     /**
-     * These methods are here just to facilitate the writing of unit-tests and should not be used in
-     * production code.
+     * These methods are here just to facilitate the writing of unit-tests and should be avoided in
+     * production code since they perform copying.
      */
     void append(uint8_t const *ptr, size_t size);
     void append(const char str[]);
