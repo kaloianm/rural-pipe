@@ -16,6 +16,8 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#include "common/base.h"
+
 #include <boost/asio.hpp>
 #include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/trivial.hpp>
@@ -90,7 +92,7 @@ private:
             struct ifreq ifr = {0};
             strcpy(ifr.ifr_name, interface.c_str());
             SYSCALL(::ioctl(sock, SIOCGIFADDR, &ifr));
-            BOOST_ASSERT(ifr.ifr_ifru.ifru_addr.sa_family == AF_INET);
+            RASSERT(ifr.ifr_ifru.ifru_addr.sa_family == AF_INET);
             return *((struct sockaddr_in *)&ifr.ifr_ifru.ifru_addr);
         }();
 

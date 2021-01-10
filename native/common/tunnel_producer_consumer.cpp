@@ -16,6 +16,8 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#include "common/base.h"
+
 #include "common/tunnel_producer_consumer.h"
 
 #include <boost/asio.hpp>
@@ -74,9 +76,9 @@ TunnelProducerConsumer::TunnelProducerConsumer(std::vector<FileDescriptor> tunne
             try {
                 _receiveFromTunnelLoop(fd);
 
-                BOOST_LOG_TRIVIAL(info) << "Thread for tunnel device " << fd.toString()
-                                        << " exited normally. This should never be reached.";
-                BOOST_ASSERT(false);
+                RASSERT_MSG(false, boost::format("Thread for tunnel device %s exited normally. "
+                                                 "This should never be reached.") %
+                                       fd.toString());
             } catch (const std::exception &ex) {
                 BOOST_LOG_TRIVIAL(info) << "Thread for tunnel device " << fd.toString()
                                         << " completed due to " << ex.what();
@@ -149,11 +151,11 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
             // Nothing was received for some time, see whether we managed to batch some frames in
             // the buffer, in which case they should be sent
             if (res == 0) {
-                BOOST_ASSERT(numDatagramsWritten);
+                RASSERT(numDatagramsWritten);
                 break;
             }
 
-            BOOST_ASSERT(res == 1);
+            RASSERT(res == 1);
 
             // Read the incoming datagram in the MTU buffer
             if (!mtuBufferSize) {
@@ -161,7 +163,7 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
             }
 
             if (mtuBufferSize > writer.remainingBytes()) {
-                BOOST_ASSERT(numDatagramsWritten);
+                RASSERT(numDatagramsWritten);
                 break;
             }
 

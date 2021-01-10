@@ -16,6 +16,8 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#include "common/base.h"
+
 #include "common/file_descriptor.h"
 
 #include <boost/log/trivial.hpp>
@@ -86,9 +88,7 @@ ScopedFileDescriptor::~ScopedFileDescriptor() {
         return;
     }
 
-    BOOST_LOG_TRIVIAL(fatal) << boost::format("Illegal file descriptor (%d): %s") % _fd %
-                                    _desc.c_str();
-    BOOST_ASSERT(false);
+    RASSERT_MSG(false, boost::format("Illegal file descriptor (%d): %s") % _fd % _desc.c_str());
 }
 
 } // namespace ruralpi

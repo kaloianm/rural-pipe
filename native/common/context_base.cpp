@@ -16,10 +16,11 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#include "common/base.h"
+
 #include "common/context_base.h"
 
 #include <boost/filesystem.hpp>
-#include <boost/format.hpp>
 #include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>

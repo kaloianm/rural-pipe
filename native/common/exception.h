@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <boost/assert.hpp>
-#include <boost/format.hpp>
 #include <exception>
 #include <string>
 

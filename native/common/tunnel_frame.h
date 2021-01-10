@@ -19,7 +19,6 @@
 #pragma once
 
 #include <array>
-#include <boost/static_assert.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <mutex>
 
@@ -39,6 +38,11 @@ struct TunnelFrameBuffer {
 
 #pragma pack(push, 1)
 
+// This section contains all the structures which go on the network in binary format. All these
+// structures assume a little-endian CPU and don't attempt to perform any conversion, hence the
+// assertion below.
+static_assert(isLittleEndianCPU());
+
 // Every tunnel frame header starts with this informational section
 struct TunnelFrameHeaderInfo {
     static constexpr char kMagic[3] = {'R', 'P', 'I'};
@@ -56,7 +60,7 @@ struct TunnelFrameHeaderInfo {
 
     static const TunnelFrameHeaderInfo &check(const ConstTunnelFrameBuffer &buf);
 };
-BOOST_STATIC_ASSERT(sizeof(TunnelFrameHeaderInfo) == 6);
+static_assert(sizeof(TunnelFrameHeaderInfo) == 6);
 
 // Every tunnel frame starts with this header
 struct TunnelFrameHeader : public TunnelFrameHeaderInfo {
@@ -80,13 +84,13 @@ struct TunnelFrameHeader : public TunnelFrameHeaderInfo {
         return *((TunnelFrameHeader *)buf.data);
     }
 };
-BOOST_STATIC_ASSERT(sizeof(TunnelFrameHeader) == 158);
+static_assert(sizeof(TunnelFrameHeader) == 158);
 
 // The datagrams in each tunnel frame are separated with this structure
 struct TunnelFrameDatagramSeparator {
     uint16_t size;
 };
-BOOST_STATIC_ASSERT(sizeof(TunnelFrameDatagramSeparator) == 2);
+static_assert(sizeof(TunnelFrameDatagramSeparator) == 2);
 
 constexpr size_t kTunnelFrameMinSize =
     sizeof(TunnelFrameHeader) + sizeof(TunnelFrameDatagramSeparator);
@@ -98,7 +102,7 @@ struct InitTunnelFrame {
     // Contains a user-friendly descriptor of the side, which sends this frame
     char identifier[16];
 };
-BOOST_STATIC_ASSERT(sizeof(InitTunnelFrame) == 16);
+static_assert(sizeof(InitTunnelFrame) == 16);
 
 #pragma pack(pop)
 

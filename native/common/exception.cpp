@@ -16,6 +16,8 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#include "common/base.h"
+
 #include "common/exception.h"
 
 #include <errno.h>
@@ -25,7 +27,7 @@ namespace ruralpi {
 namespace {
 
 std::string errnoMsg(int e) {
-    BOOST_ASSERT(e);
+    RASSERT(e);
     char buf[1024];
     return boost::str(boost::format("(%d): %s") % e % strerror_r(e, buf, sizeof(buf)));
 }

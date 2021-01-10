@@ -16,6 +16,8 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#include "common/base.h"
+
 #include "common/tunnel_frame.h"
 
 #include <boost/log/trivial.hpp>
@@ -79,8 +81,8 @@ bool TunnelFrameReader::next() {
 
 TunnelFrameWriter::TunnelFrameWriter(const TunnelFrameBuffer &buf)
     : _begin(buf.data), _current(_begin + sizeof(TunnelFrameHeader)), _end(_begin + buf.size) {
-    BOOST_ASSERT(buf.size >= kTunnelFrameMinSize);
-    BOOST_ASSERT(buf.size <= kTunnelFrameMaxSize);
+    RASSERT(buf.size >= kTunnelFrameMinSize);
+    RASSERT(buf.size <= kTunnelFrameMaxSize);
 
     auto &hdr = header();
     memcpy(hdr.magic, TunnelFrameHeader::kMagic, sizeof(TunnelFrameHeader::kMagic));
@@ -94,14 +96,15 @@ size_t TunnelFrameWriter::remainingBytes() const {
     if (!diff)
         return 0;
 
-    BOOST_ASSERT(diff >= sizeof(TunnelFrameDatagramSeparator));
+    RASSERT_MSG(diff >= sizeof(TunnelFrameDatagramSeparator),
+                boost::format("Invalid writer state with %d bytes left") % diff);
     return diff - sizeof(TunnelFrameDatagramSeparator);
 }
 
 void TunnelFrameWriter::onDatagramWritten(size_t size) {
     ((TunnelFrameDatagramSeparator *)_current)->size = size;
     _current += sizeof(TunnelFrameDatagramSeparator) + size;
-    BOOST_ASSERT(_current <= _end);
+    RASSERT(_current <= _end);
 }
 
 void TunnelFrameWriter::close() {
@@ -141,11 +144,11 @@ void TunnelFramePipe::pipeInvokeNext(TunnelFrameBuffer buf) {
 
 void TunnelFramePipe::pipePush(TunnelFramePipe &prev) {
     std::lock_guard<std::mutex> lgThis(_mutex);
-    BOOST_ASSERT(_prev == &kNotYetReadyTunnelFramePipe);
-    BOOST_ASSERT(_next == &kNotYetReadyTunnelFramePipe);
+    RASSERT(_prev == &kNotYetReadyTunnelFramePipe);
+    RASSERT(_next == &kNotYetReadyTunnelFramePipe);
 
     std::lock_guard<std::mutex> lgPrev(prev._mutex);
-    BOOST_ASSERT(prev._next == &kNotYetReadyTunnelFramePipe);
+    RASSERT(prev._next == &kNotYetReadyTunnelFramePipe);
 
     _prev = &prev;
     prev._next = this;
@@ -153,10 +156,10 @@ void TunnelFramePipe::pipePush(TunnelFramePipe &prev) {
 
 void TunnelFramePipe::pipePop() {
     std::lock_guard<std::mutex> lgThis(_mutex);
-    BOOST_ASSERT(_next == &kNotYetReadyTunnelFramePipe);
+    RASSERT(_next == &kNotYetReadyTunnelFramePipe);
 
     std::lock_guard<std::mutex> lgPrev(_prev->_mutex);
-    BOOST_ASSERT(_prev->_next == this);
+    RASSERT(_prev->_next == this);
 
     _prev->_next = &kNotYetReadyTunnelFramePipe;
     _prev = &kNotYetReadyTunnelFramePipe;

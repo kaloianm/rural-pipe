@@ -16,6 +16,8 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#include "common/base.h"
+
 #include "common/socket_producer_consumer.h"
 
 #include <boost/asio.hpp>
@@ -87,7 +89,7 @@ SocketProducerConsumer::~SocketProducerConsumer() {
     _interrupted.store(true);
     _pool.join();
 
-    BOOST_ASSERT(_sessions.empty());
+    RASSERT(_sessions.empty());
 
     pipePop();
     BOOST_LOG_TRIVIAL(info) << "Socket producer/consumer finished";
@@ -150,9 +152,10 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
         try {
             _receiveFromSocketLoop(session, stream);
 
-            BOOST_LOG_TRIVIAL(info) << "Thread for socket " << stream.toString()
-                                    << " exited normally. This should never be reached.";
-            BOOST_ASSERT(false);
+            RASSERT_MSG(false,
+                        boost::format(
+                            "Thread for socket %s exited normally. This should never be reached.") %
+                            stream.toString());
         } catch (const std::exception &ex) {
             BOOST_LOG_TRIVIAL(info)
                 << "Thread for socket " << stream.toString() << " completed due to " << ex.what();
@@ -229,7 +232,7 @@ TunnelFrameBuffer TunnelFrameStream::receive() {
         numRead += _fd.read((void *)&_buffer[numRead], totalSize - numRead);
     }
 
-    BOOST_ASSERT(numRead == totalSize);
+    RASSERT(numRead == totalSize);
     return {_buffer, totalSize};
 }
 

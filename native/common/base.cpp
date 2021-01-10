@@ -1,6 +1,5 @@
-
 /**
- * Copyright 2020 Kaloian Manassiev
+ * Copyright 2021 Kaloian Manassiev
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  * associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -17,36 +16,34 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#include <boost/log/trivial.hpp>
+#include <execinfo.h>
+
 #include "common/base.h"
 
-#include "server/context.h"
-
 namespace ruralpi {
-namespace server {
 
-namespace po = boost::program_options;
-
-Context::Context() : ContextBase("server") {
-    // clang-format off
-    _desc.add_options()
-        ("settings.port", po::value<int>()->default_value(50003), "Port on which to listen for connections")
-    ;
-    // clang-format on
-}
-
-Context::~Context() = default;
-
-Context::ShouldStart Context::start(int argc, const char *argv[]) {
-    ShouldStart shouldStart = ContextBase::start(
-        argc, argv, [this](int argc, const char *argv[]) { return _onCommand(argc, argv); });
-    if (shouldStart == kYes) {
-        port = _vm["settings.port"].as<int>();
+void assertFailedNoReturn(const char condition[], const char location[], const char context[]) {
+    BOOST_LOG_TRIVIAL(fatal) << "Assertion condition \"" << condition << "\" failed at " << location
+                             << ": " << context;
+    void *backtraceSymbols[1024];
+    int numSyms = ::backtrace(backtraceSymbols, 1024);
+    if (numSyms <= 0) {
+        BOOST_LOG_TRIVIAL(fatal) << "Unable to extract backtrace";
+    } else {
+        char **btSyms = ::backtrace_symbols(backtraceSymbols, numSyms);
+        BOOST_LOG_TRIVIAL(fatal) << "BACKTRACE:";
+        for (int i = 0; i < numSyms; i++) {
+            BOOST_LOG_TRIVIAL(fatal) << btSyms[i];
+        }
+        ::free(btSyms);
     }
 
-    return shouldStart;
+    abort();
 }
 
-std::string Context::_onCommand(int argc, const char *argv[]) { return ""; }
+void assertFailedNoReturn(const char condition[], const char location[], const boost::format &fmt) {
+    assertFailedNoReturn(condition, location, boost::str(fmt).c_str());
+}
 
-} // namespace server
 } // namespace ruralpi
