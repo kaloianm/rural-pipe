@@ -84,5 +84,6 @@ env = MakeCommonNativeEnv('CLIENT_ARCH')
 SConscript('client/SConscript', exports='env', duplicate=0)
 
 # Build the Server
-env = MakeCommonNativeEnv('SERVER_ARCH')
+if native_env['SERVER_ARCH'] != native_env['CLIENT_ARCH']:
+    env = MakeCommonNativeEnv('SERVER_ARCH')
 SConscript('server/SConscript', exports='env', duplicate=0)
