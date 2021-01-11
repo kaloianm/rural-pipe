@@ -32,4 +32,12 @@ common = env.Library(
         'tunnel_producer_consumer.cpp',
     ],
 )
+
+env.Program(
+    target='common_tests',
+    source=[
+        'common_tests_main.cpp',
+    ],
+)
+
 Return('common')

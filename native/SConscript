@@ -65,9 +65,7 @@ def MakeCommonNativeEnv(arch_name):
     env.Append(CPPPATH=[os.path.join(boost_install_directory, 'boost', 'include')])
     env.Append(LIBPATH=[
         os.path.join(boost_install_directory, 'boost', 'lib'),
-        native_env.Dir(os.path.join(arch['arch'], 'common'))
     ])
-    env.Append(LIBS=['common', boost_library_names, 'pthread'])
     for (tool, name) in [
         ('CXX', 'g++'),
     ]:
@@ -76,6 +74,7 @@ def MakeCommonNativeEnv(arch_name):
     # Build the common library
     common = SConscript('common/SConscript', variant_dir=os.path.join(arch['arch'], 'common'),
                         exports='env', duplicate=0)
+    env.Append(LIBS=[common, boost, 'pthread'])
     return env
 
 

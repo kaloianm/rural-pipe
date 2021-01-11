@@ -27,10 +27,3 @@ server = env.Program(
     ],
 )
 env.Install(os.path.join(Dir('#').abspath, 'install/server'), [server])
-
-server_tests = env.Program(
-    target='server_tests',
-    source=[
-        'server_tests_main.cpp',
-    ],
-)
