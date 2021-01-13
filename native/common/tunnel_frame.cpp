@@ -62,9 +62,11 @@ const TunnelFrameHeaderInfo &TunnelFrameHeaderInfo::check(const ConstTunnelFrame
     return hdrInfo;
 }
 
-TunnelFrameReader::TunnelFrameReader(const ConstTunnelFrameBuffer &buf)
-    : _begin(buf.data), _current(_begin), _end(_begin + buf.size) {
-    // TODO: Check the signature
+TunnelFrameReader::TunnelFrameReader(const ConstTunnelFrameBuffer &buf) {
+    const auto &hdrInfo = TunnelFrameHeaderInfo::check(buf);
+    _begin = buf.data;
+    _current = _begin;
+    _end = _begin + hdrInfo.desc.size;
 }
 
 TunnelFrameReader::TunnelFrameReader(const TunnelFrameBuffer &buf)
@@ -73,10 +75,13 @@ TunnelFrameReader::TunnelFrameReader(const TunnelFrameBuffer &buf)
 bool TunnelFrameReader::next() {
     if (_current == _begin)
         _current += sizeof(TunnelFrameHeader);
-    else if (size() > 0)
+    else if (_current < _end)
         _current += sizeof(TunnelFrameDatagramSeparator) + size();
 
-    return size() > 0;
+    if (_current > _end)
+        throw Exception("Badly formatted frame");
+
+    return _current < _end;
 }
 
 TunnelFrameWriter::TunnelFrameWriter(const TunnelFrameBuffer &buf)
@@ -92,24 +97,22 @@ TunnelFrameWriter::TunnelFrameWriter(const TunnelFrameBuffer &buf)
 }
 
 size_t TunnelFrameWriter::remainingBytes() const {
-    int diff = _end - data();
-    if (!diff)
+    if (_end - _current < sizeof(TunnelFrameDatagramSeparator))
         return 0;
 
-    RASSERT_MSG(diff >= sizeof(TunnelFrameDatagramSeparator),
-                boost::format("Invalid writer state with %d bytes left") % diff);
-    return diff - sizeof(TunnelFrameDatagramSeparator);
+    return _end - data();
 }
 
 void TunnelFrameWriter::onDatagramWritten(size_t size) {
     ((TunnelFrameDatagramSeparator *)_current)->size = size;
     _current += sizeof(TunnelFrameDatagramSeparator) + size;
-    RASSERT(_current <= _end);
+    RASSERT_MSG(_current <= _end,
+                boost::format("Writing a frame of size %1% resulted in invalid writer state: "
+                              "_current = %2%, _end = %3%") %
+                    size % (void *)_current % (void *)_end);
 }
 
 void TunnelFrameWriter::close() {
-    onDatagramWritten(0);
-
     auto &hdr = header();
     hdr.desc.size = _current - _begin;
 }

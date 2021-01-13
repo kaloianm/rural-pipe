@@ -36,10 +36,8 @@ FileDescriptor::FileDescriptor(const std::string &desc, int fd) : _desc(desc), _
 FileDescriptor::FileDescriptor(const FileDescriptor &) = default;
 
 FileDescriptor::FileDescriptor(FileDescriptor &&other) {
-    if (&other == this)
-        return;
-
     _desc = std::move(other._desc);
+
     _fd = other._fd;
     other._fd = -1;
 }

@@ -61,6 +61,7 @@ void tunnelFrameTests() {
         LOG << "Small size datagram write";
         TunnelFrameWriter writer({buffer, kTunnelFrameMaxSize});
         LOG << writer.remainingBytes();
+        CHECK(writer.remainingBytes() == 3936); // Header + Separator
         writer.append("DG1");
         LOG << writer.remainingBytes();
         writer.append("DG2");
@@ -117,6 +118,18 @@ void tunnelFrameTests() {
         TunnelFrameReader reader(ConstTunnelFrameBuffer{buffer, kTunnelFrameMaxSize});
         CHECK(reader.header().seqNum == 2);
         CHECK(!reader.next());
+    }
+    {
+        LOG << "Random writes";
+        for (int i = 0; i < 5000; i++) {
+            TunnelFrameWriter writer({buffer, kTunnelFrameMaxSize});
+            for (int numDatagramsToWrite = std::max(5, rand() % 1000);
+                 numDatagramsToWrite == 0 || writer.remainingBytes() < 5; numDatagramsToWrite--) {
+                writer.append(buffer,
+                              std::min(size_t(5), size_t(rand() % writer.remainingBytes())));
+            }
+            writer.close();
+        }
     }
 }
 

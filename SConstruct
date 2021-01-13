@@ -32,9 +32,11 @@ target_choices = {
     },
 }
 
-# --client_arch
-AddOption('--client_arch', dest='client_arch', type='choice', choices=list(target_choices.keys()),
-          default='pc', help='Use CLIENT_ARCH as the architecture for the client')
+AddOption('--client_arch', default='pc', dest='client_arch', type='choice',
+          choices=list(target_choices.keys()),
+          help='Use CLIENT_ARCH as the architecture for the client')
+AddOption('--dbg', action='append_const', dest='cflags', const='-g -Og')
+AddOption('--opt', action='append_const', dest='cflags', const='-O3')
 
 #
 # END: command-line options for the build
@@ -45,6 +47,7 @@ env = Environment(
     CLIENT_ARCH=target_choices[GetOption('client_arch')],
     SERVER_ARCH=target_choices['pc'],
 )
+env.MergeFlags(GetOption('cflags'))
 
 SConscript('native/SConscript', exports='env', variant_dir='build/native', duplicate=0)
 SConscript('control/SConscript', exports='env', variant_dir='build/control', duplicate=0)

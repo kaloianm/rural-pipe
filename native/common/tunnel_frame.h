@@ -133,8 +133,8 @@ public:
     size_t size() const { return ((TunnelFrameDatagramSeparator const *)_current)->size; }
 
 private:
-    uint8_t const *const _begin;
-    uint8_t const *const _end;
+    uint8_t const *_begin;
+    uint8_t const *_end;
     uint8_t const *_current;
 };
 
