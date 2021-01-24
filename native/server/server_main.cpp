@@ -108,9 +108,9 @@ void serverMain(Context &ctx) {
     SocketProducerConsumer socketPC(false /* isClient */, tunnelPC);
     Server server(ctx, socketPC);
 
-    std::cout << "Rural Pipe server running" << std::endl; // Indicates to the startup script that
-                                                           // the tunnel device has been created and
-                                                           // that it can configure the routing
+    std::cout << "Rural Pipe running" << std::endl; // Indicates to the startup script that the
+                                                    // tunnel device has been created and that it
+                                                    // can configure the routing
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe server running";
     ctx.waitForExit();
 }

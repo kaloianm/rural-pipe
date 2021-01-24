@@ -19,87 +19,38 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import asyncio
-import common
-import ipaddress
 import os
+import subprocess
 import sys
 
-from configparser import ConfigParser
-from optparse import OptionParser
+from common import Service
 
 
-async def start_server_and_wait(options):
-    print('Starting server service with options:', options)
+class ServerService(Service):
+    def __init__(self):
+        super().__init__('server')
 
-    ip_iface = ipaddress.ip_interface(options.bind_ip)
-    ip_network = ipaddress.ip_network(ip_iface.network)
-    print('Network:', str(ip_network.network_address))
+    def add_service_options(self, parser, config):
+        parser.add_option('--wan_interface', dest='wan_interface',
+                          help='Interface on which all traffic to the internet must go',
+                          default=config.get('settings', 'wan_interface'))
 
-    common.make_control_fifo('server')
-
-    server_process = await asyncio.create_subprocess_exec(os.path.join(sys.path[0], 'server'),
-                                                          stdin=asyncio.subprocess.PIPE,
-                                                          stdout=asyncio.subprocess.PIPE,
-                                                          stderr=asyncio.subprocess.STDOUT)
-    first_line = await server_process.stdout.readline()
-    if not first_line.decode().startswith('Rural Pipe server running'):
-        print('Received unexpected response from the process:', first_line.decode())
-        try:
-            server_process.kill()
-        except:
-            pass
-        print('Failed to start service')
-        return await server_process.wait()
-
-    print('Server started and active, configuring routing ...')
-
-    # Check if NAT is enabled for the server's WAN interface so that packets can flow
-    ipcmd = await asyncio.create_subprocess_shell(
-        'iptables -C POSTROUTING -t nat -o {} -j MASQUERADE'.format(options.wan_interface))
-    try:
+    async def pre_configure(self):
+        # Check if NAT is enabled for the server's WAN interface so that packets can flow
+        ipcmd = await asyncio.create_subprocess_shell(
+            f'iptables -C POSTROUTING -t nat -o {self.options.wan_interface} -j MASQUERADE')
         if await ipcmd.wait() > 0:
-            raise Exception({
-                'NAT is not configured. Please run: sudo iptables -A POSTROUTING -t nat -o {} -j MASQUERADE'
-            }.format(options.wan_interface))
-    except:
-        try:
-            server_process.kill()
-        except:
-            pass
-        return await server_process.wait()
+            raise Exception(f"""NAT is not configured. Please run the following command:
+                                sudo iptables -A POSTROUTING -t nat -o {self.options.wan_interface} -j MASQUERADE"""
+                            )
 
-    # Configure the IP address of the interface
-    ipcmd = await asyncio.create_subprocess_shell('ip link set rpis up')
-    await ipcmd.wait()
-    ipcmd = await asyncio.create_subprocess_shell('ip addr add ' + str(ip_iface) + ' dev rpis')
-    await ipcmd.wait()
-
-    print('Routing configured')
-
-    while True:
-        line = await server_process.stdout.readline()
-        if not line:
-            break
-        print(line.decode())
-
-    return await server_process.wait()
+    async def post_configure(self):
+        pass
 
 
 def main():
     os.chdir(sys.path[0])
-
-    config = ConfigParser()
-    config_files_read = config.read('server.cfg')
-
-    parser = OptionParser()
-    parser.add_option('--bind_ip', dest='bind_ip', help='IP address to which to bind the network',
-                      default=config.get('settings', 'bind_ip'))
-    parser.add_option('--wan_interface', dest='wan_interface',
-                      help='Interface on which all traffic to the internet must go',
-                      default=config.get('settings', 'wan_interface'))
-
-    (options, args) = parser.parse_args()
-    sys.exit(asyncio.run(start_server_and_wait(options)))
+    ServerService()
 
 
 if __name__ == "__main__":

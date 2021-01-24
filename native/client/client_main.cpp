@@ -128,9 +128,9 @@ void clientMain(Context &ctx) {
     SocketProducerConsumer socketPC(true /* isClient */, tunnelPC);
     Client client(ctx, socketPC);
 
-    std::cout << "Rural Pipe client running" << std::endl; // Indicates to the startup script that
-                                                           // the tunnel device has been created and
-                                                           // that it can configure the routing
+    std::cout << "Rural Pipe running" << std::endl; // Indicates to the startup script that the
+                                                    // tunnel device has been created and that it
+                                                    // can configure the routing
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe client running";
     ctx.waitForExit();
 }

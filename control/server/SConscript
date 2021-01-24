@@ -20,6 +20,6 @@ import os
 Import('control_env')
 env = control_env.Clone()
 
-files_to_install = list(map(lambda f: env.File(f), ['start.py', 'config.cfg']))
+files_to_install = list(map(lambda f: env.File(f), ['start.py', 'server.cfg']))
 
 Return('files_to_install')
