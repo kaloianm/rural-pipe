@@ -19,6 +19,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import asyncio
+import common
 import ipaddress
 import os
 import sys
@@ -34,12 +35,12 @@ async def start_server_and_wait(options):
     ip_network = ipaddress.ip_network(ip_iface.network)
     print('Network:', str(ip_network.network_address))
 
-    if not os.path.exists('/tmp/server'):
-        os.mkfifo('/tmp/server', mode=0o666)
+    common.make_control_fifo('server')
 
-    server_process = await asyncio.create_subprocess_exec(
-        os.path.join(sys.path[0], 'server'), stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+    server_process = await asyncio.create_subprocess_exec(os.path.join(sys.path[0], 'server'),
+                                                          stdin=asyncio.subprocess.PIPE,
+                                                          stdout=asyncio.subprocess.PIPE,
+                                                          stderr=asyncio.subprocess.STDOUT)
     first_line = await server_process.stdout.readline()
     if not first_line.decode().startswith('Rural Pipe server running'):
         print('Received unexpected response from the process:', first_line.decode())

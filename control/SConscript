@@ -15,9 +15,18 @@
 # DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import os
+
 Import('env')
 
 control_env = env.Clone()
 
-SConscript('client/SConscript', exports='control_env')
-SConscript('server/SConscript', exports='control_env')
+common = SConscript('common/SConscript', exports='control_env')
+client = SConscript('client/SConscript', exports='control_env')
+server = SConscript('server/SConscript', exports='control_env')
+
+env.Install(os.path.join(env.Dir('#').abspath, 'install/client'), common)
+env.Install(os.path.join(env.Dir('#').abspath, 'install/client'), client)
+
+env.Install(os.path.join(env.Dir('#').abspath, 'install/server'), common)
+env.Install(os.path.join(env.Dir('#').abspath, 'install/server'), server)

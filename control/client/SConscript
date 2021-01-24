@@ -20,7 +20,7 @@ import os
 Import('control_env')
 env = control_env.Clone()
 
-env.Command(os.path.join(Dir('#').abspath, 'install/client/start.py'), 'start.py',
-            Copy('$TARGET', '$SOURCE'))
-env.Command(os.path.join(Dir('#').abspath, 'install/client/client.cfg'),
-            'default_client_config.cfg', Copy('$TARGET', '$SOURCE'))
+files_to_install = list(
+    map(lambda f: env.File(f), ['start.py', 'config.cfg', 'configure_client.py']))
+
+Return('files_to_install')

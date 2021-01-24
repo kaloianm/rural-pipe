@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+#
+
 # Copyright 2020 Kaloian Manassiev
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
@@ -17,9 +20,10 @@
 
 import os
 
-Import('control_env')
-env = control_env.Clone()
 
-files_to_install = list(map(lambda f: env.File(f), ['start.py', 'config.cfg']))
-
-Return('files_to_install')
+# Creates the control fifo device which will be opened by both the client and server service to
+# listen for control commands
+def make_control_fifo(service_name):
+    fifo_path = os.path.join('/tmp', service_name)
+    if not os.path.exists(fifo_path):
+        os.mkfifo(fifo_path, mode=0o666)

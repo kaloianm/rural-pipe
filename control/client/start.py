@@ -19,6 +19,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import asyncio
+import common
 import ipaddress
 import os
 import sys
@@ -38,8 +39,8 @@ async def start_client_and_wait(options):
     ip_network = ipaddress.ip_network(ip_iface.network)
     print('Network:', str(ip_network.network_address))
 
-    if not os.path.exists('/tmp/client'):
-        os.mkfifo('/tmp/client', mode=0o666)
+    common.make_control_fifo('client')
+
     client_process = await asyncio.create_subprocess_exec(os.path.join(sys.path[0], 'client'),
                                                           stdin=asyncio.subprocess.PIPE,
                                                           stdout=asyncio.subprocess.PIPE,
