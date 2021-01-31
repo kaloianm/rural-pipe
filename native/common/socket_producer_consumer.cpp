@@ -81,7 +81,9 @@ InitialExchangeResult initialTunnelFrameExchange(TunnelFrameStream &stream, bool
 
 SocketProducerConsumer::SocketProducerConsumer(bool isClient, TunnelFramePipe &prev)
     : TunnelFramePipe("Socket"), _isClient(isClient) {
-    pipePush(prev);
+    _compresser.emplace(prev);
+    _signer.emplace(*_compresser);
+    pipePush(*_signer);
     BOOST_LOG_TRIVIAL(info) << "Socket producer/consumer started";
 }
 
@@ -92,6 +94,8 @@ SocketProducerConsumer::~SocketProducerConsumer() {
     RASSERT(_sessions.empty());
 
     pipePop();
+    _signer.reset();
+    _compresser.reset();
     BOOST_LOG_TRIVIAL(info) << "Socket producer/consumer finished";
 }
 
@@ -163,7 +167,7 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
     });
 }
 
-void SocketProducerConsumer::onTunnelFrameReady(TunnelFrameBuffer buf) {
+void SocketProducerConsumer::onTunnelFrameFromPrev(TunnelFrameBuffer buf) {
     std::lock_guard<std::mutex> lg(_mutex);
 
     if (_sessions.empty())
@@ -172,6 +176,10 @@ void SocketProducerConsumer::onTunnelFrameReady(TunnelFrameBuffer buf) {
     // TODO: Choose a client/server connection to send it on based on some bandwidth requirements
     // metric, etc.
     _sessions.begin()->second.streams.front().send(buf);
+}
+
+void SocketProducerConsumer::onTunnelFrameFromNext(TunnelFrameBuffer buf) {
+    RASSERT_MSG(false, "Socket producer consumer must be the last one in the chain");
 }
 
 void SocketProducerConsumer::_receiveFromSocketLoop(Session &session, TunnelFrameStream &stream) {

@@ -21,11 +21,13 @@ common = env.Library(
     target='common',
     source=[
         'base.cpp',
+        'compressing_tunnel_frame_pipe.cpp',
         'commands_server.cpp',
         'context_base.cpp',
         'exception.cpp',
         'file_descriptor.cpp',
         'ip_parsers.cpp',
+        'signing_tunnel_frame_pipe.cpp',
         'socket_producer_consumer.cpp',
         'tun_ctl.cpp',
         'tunnel_frame.cpp',

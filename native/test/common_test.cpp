@@ -204,7 +204,7 @@ BOOST_AUTO_TEST_CASE(Tests) {
 
         ~TestPipe() { pipePop(); }
 
-        void onTunnelFrameReady(TunnelFrameBuffer buf) override {
+        void onTunnelFrameFromPrev(TunnelFrameBuffer buf) override {
             TLOG << "Received tunnel frame of " << buf.size << " bytes";
 
             std::lock_guard<std::mutex> lg(mutex);
@@ -212,6 +212,8 @@ BOOST_AUTO_TEST_CASE(Tests) {
             lastFrameReceivedSize = buf.size;
             ++numFramesReceived;
         }
+
+        void onTunnelFrameFromNext(TunnelFrameBuffer buf) override { RASSERT(false); }
 
         int getNumFramesReceived() {
             std::lock_guard<std::mutex> lg(mutex);
@@ -250,7 +252,8 @@ BOOST_AUTO_TEST_CASE(Tests) {
     struct TestPipe : public TunnelFramePipe {
         TestPipe() : TunnelFramePipe("socketProducerConsumerTests") {}
 
-        void onTunnelFrameReady(TunnelFrameBuffer buf) override {}
+        void onTunnelFrameFromPrev(TunnelFrameBuffer buf) override { RASSERT(false); }
+        void onTunnelFrameFromNext(TunnelFrameBuffer buf) override { RASSERT(false); }
     } testPipe;
 
     SocketProducerConsumer socketPC(true /* isClient */, testPipe);

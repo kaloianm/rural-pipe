@@ -20,6 +20,7 @@
 
 #include <array>
 #include <boost/uuid/uuid.hpp>
+#include <condition_variable>
 #include <mutex>
 
 namespace ruralpi {
@@ -187,8 +188,11 @@ private:
 };
 
 /**
- * Interface for exchanging tunnel frames between two parties (namely the tunnel producer/consumer
- * and the client/server socket).
+ * Interface for exchanging tunnel frames between two parties (namely between the tunnel
+ * producer/consumer and the client/server socket, which actually sends them on the wire).
+ *
+ * The tunnel frame pipes can be stacked in order to allow transformations, such as compression,
+ * etc, to be performed before sending on the wire.
  */
 class TunnelFramePipe {
 public:
@@ -202,7 +206,8 @@ public:
      *
      * The method must not block if the upstream called is unable to process the stream immediately.
      */
-    virtual void onTunnelFrameReady(TunnelFrameBuffer buf) = 0;
+    virtual void onTunnelFrameFromPrev(TunnelFrameBuffer buf) = 0;
+    virtual void onTunnelFrameFromNext(TunnelFrameBuffer buf) = 0;
 
     /**
      * Invoke the `onTunnelFrameReady` method of the previous or next pipe in the chain.
@@ -212,18 +217,26 @@ public:
 
 protected:
     TunnelFramePipe(std::string desc);
-    TunnelFramePipe(std::string desc, TunnelFramePipe *prev, TunnelFramePipe *next);
 
     void pipePush(TunnelFramePipe &prev);
     void pipePop();
 
 private:
-    const std::string _desc;
+    class NotYetReadyTunnelFramePipe;
+    static NotYetReadyTunnelFramePipe kNotYetReadyTunnelFramePipe;
 
-    std::mutex _mutex;
+    TunnelFramePipe(std::string desc, TunnelFramePipe *prev, TunnelFramePipe *next);
+
+    const std::string _desc;
 
     TunnelFramePipe *_prev;
     TunnelFramePipe *_next;
+
+    std::mutex _mutex;
+    std::condition_variable _cv;
+
+    bool _nextIsDetaching{false};
+    int _numCallsToNext{0};
 };
 
 } // namespace ruralpi

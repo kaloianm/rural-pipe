@@ -30,16 +30,6 @@ namespace {
 
 const uint8_t kVersion = 1;
 
-class NotYetReadyTunnelFramePipe : public TunnelFramePipe {
-public:
-    NotYetReadyTunnelFramePipe() : TunnelFramePipe("NotYetReady", nullptr, nullptr) {}
-
-    void onTunnelFrameReady(TunnelFrameBuffer buf) {
-        throw NotYetReadyException("Received frame before the pipe was configured");
-    }
-
-} kNotYetReadyTunnelFramePipe;
-
 } // namespace
 
 constexpr char TunnelFrameHeaderInfo::kMagic[3];
@@ -128,29 +118,50 @@ void TunnelFrameWriter::append(const std::string &str) {
     append((uint8_t const *)str.c_str(), str.size());
 }
 
+class TunnelFramePipe::NotYetReadyTunnelFramePipe : public TunnelFramePipe {
+public:
+    NotYetReadyTunnelFramePipe() : TunnelFramePipe("NotYetReady", nullptr, nullptr) {}
+
+    void onTunnelFrameFromPrev(TunnelFrameBuffer buf) {
+        throw NotYetReadyException("Received frame before the pipe was configured");
+    }
+
+    void onTunnelFrameFromNext(TunnelFrameBuffer buf) {
+        throw NotYetReadyException("Received frame before the pipe was configured");
+    }
+};
+
 TunnelFramePipe::TunnelFramePipe(std::string desc)
     : TunnelFramePipe(std::move(desc), &kNotYetReadyTunnelFramePipe, &kNotYetReadyTunnelFramePipe) {
 }
 
+TunnelFramePipe::NotYetReadyTunnelFramePipe TunnelFramePipe::kNotYetReadyTunnelFramePipe;
+
 TunnelFramePipe::TunnelFramePipe(std::string desc, TunnelFramePipe *prev, TunnelFramePipe *next)
     : _desc(std::move(desc)), _prev(prev), _next(next) {}
 
-void TunnelFramePipe::pipeInvokePrev(TunnelFrameBuffer buf) {
-    std::lock_guard<std::mutex> lg(_prev->_mutex);
-    _prev->onTunnelFrameReady(buf);
-}
+void TunnelFramePipe::pipeInvokePrev(TunnelFrameBuffer buf) { _prev->onTunnelFrameFromNext(buf); }
 
 void TunnelFramePipe::pipeInvokeNext(TunnelFrameBuffer buf) {
-    std::lock_guard<std::mutex> lg(_next->_mutex);
-    _next->onTunnelFrameReady(buf);
+    TunnelFramePipe *next;
+    {
+        std::lock_guard<std::mutex> lg(_mutex);
+        if (!_nextIsDetaching)
+            _numCallsToNext++;
+        next = _next;
+    }
+    ScopedGuard sg([&] {
+        std::lock_guard<std::mutex> lg(_next->_mutex);
+        if (0 == --_numCallsToNext && _nextIsDetaching)
+            _cv.notify_all();
+    });
+
+    next->onTunnelFrameFromPrev(buf);
 }
 
 void TunnelFramePipe::pipePush(TunnelFramePipe &prev) {
-    std::lock_guard<std::mutex> lgThis(_mutex);
     RASSERT(_prev == &kNotYetReadyTunnelFramePipe);
     RASSERT(_next == &kNotYetReadyTunnelFramePipe);
-
-    std::lock_guard<std::mutex> lgPrev(prev._mutex);
     RASSERT(prev._next == &kNotYetReadyTunnelFramePipe);
 
     _prev = &prev;
@@ -158,13 +169,16 @@ void TunnelFramePipe::pipePush(TunnelFramePipe &prev) {
 }
 
 void TunnelFramePipe::pipePop() {
-    std::lock_guard<std::mutex> lgThis(_mutex);
     RASSERT(_next == &kNotYetReadyTunnelFramePipe);
-
-    std::lock_guard<std::mutex> lgPrev(_prev->_mutex);
     RASSERT(_prev->_next == this);
 
-    _prev->_next = &kNotYetReadyTunnelFramePipe;
+    {
+        std::unique_lock<std::mutex> ul(_prev->_mutex);
+        _prev->_nextIsDetaching = true;
+        _prev->_next = &kNotYetReadyTunnelFramePipe;
+        _prev->_cv.wait(ul, [&] { return _prev->_numCallsToNext == 0; });
+    }
+
     _prev = &kNotYetReadyTunnelFramePipe;
 }
 

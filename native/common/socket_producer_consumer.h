@@ -25,7 +25,9 @@
 #include <mutex>
 #include <unordered_map>
 
+#include "common/compressing_tunnel_frame_pipe.h"
 #include "common/file_descriptor.h"
+#include "common/signing_tunnel_frame_pipe.h"
 #include "common/tunnel_frame.h"
 
 namespace ruralpi {
@@ -78,7 +80,8 @@ public:
 
 private:
     // TunnelFramePipe methods
-    void onTunnelFrameReady(TunnelFrameBuffer buf) override;
+    void onTunnelFrameFromPrev(TunnelFrameBuffer buf) override;
+    void onTunnelFrameFromNext(TunnelFrameBuffer buf) override;
 
     /**
      * Encapsulates the entire runtime state of a session between a client and server.
@@ -105,14 +108,19 @@ private:
     // Indicates whether this socket is run as a client or server
     const bool _isClient;
 
+    // Passthrough pipes to sign and check signatures, compress and decompress the exchanged tunnel
+    // frames
+    boost::optional<CompressingTunnelFramePipe> _compresser;
+    boost::optional<SigningTunnelFramePipe> _signer;
+
     // Set of threads draining the streams from `_streams`
     boost::asio::thread_pool _pool;
 
-    // Mutex to protect access to the state below
-    std::mutex _mutex;
-
     // Associated with the `_receiveFromSocketLoop`
     std::atomic<bool> _interrupted{false};
+
+    // Mutex to protect access to the state below
+    std::mutex _mutex;
 
     // Set of streams to the connected clients or server
     SessionsMap _sessions;

@@ -96,7 +96,11 @@ TunnelProducerConsumer::~TunnelProducerConsumer() {
     BOOST_LOG_TRIVIAL(info) << "Tunnel producer/consumer finished";
 }
 
-void TunnelProducerConsumer::onTunnelFrameReady(TunnelFrameBuffer buf) {
+void TunnelProducerConsumer::onTunnelFrameFromPrev(TunnelFrameBuffer buf) {
+    RASSERT_MSG(false, "Tunnel producer consumer must be the first one in the chain");
+}
+
+void TunnelProducerConsumer::onTunnelFrameFromNext(TunnelFrameBuffer buf) {
     TunnelFrameReader reader(buf);
     while (reader.next()) {
         // Ensure that the same source/destination address pair always uses the same tunnel device

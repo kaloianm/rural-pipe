@@ -39,7 +39,8 @@ public:
 
 private:
     // TunnelFramePipe methods
-    void onTunnelFrameReady(TunnelFrameBuffer buf) override;
+    void onTunnelFrameFromPrev(TunnelFrameBuffer buf) override;
+    void onTunnelFrameFromNext(TunnelFrameBuffer buf) override;
 
     /**
      * One of these functions runs on a separate thread per tunnel file descriptor (from
