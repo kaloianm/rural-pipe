@@ -39,11 +39,13 @@ constexpr bool isLittleEndianCPU() {
 void assertFailedNoReturn(const char condition[], const char location[], const char context[]);
 void assertFailedNoReturn(const char condition[], const char location[], const boost::format &fmt);
 
-#define RASSERT_MSG(x, msg)                                                                        \
+// Assertions, which are evaluated in both debug and release mode
+
+#define RASSERT_MSG(x, msgOrFmt)                                                                   \
     {                                                                                              \
         if (!(x))                                                                                  \
             assertFailedNoReturn(BOOST_PP_STRINGIZE(x), __FILE__ ":" BOOST_PP_STRINGIZE(__LINE__), \
-                                 msg);                                                             \
+                                                                                        msgOrFmt); \
     }
 
 #define RASSERT(x) RASSERT_MSG(x, "")

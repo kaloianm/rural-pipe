@@ -21,7 +21,6 @@
 #include <boost/asio.hpp>
 #include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/trivial.hpp>
-#include <iostream>
 #include <sys/socket.h>
 
 #include "client/context.h"
@@ -120,18 +119,17 @@ private:
 void clientMain(Context &ctx) {
     BOOST_LOG_NAMED_SCOPE("clientMain");
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe client starting with server " << ctx.serverHost << ':'
-                            << ctx.serverPort << " and " << ctx.nqueues << " queues";
+                            << ctx.serverPort << " and tunnel interface " << ctx.tunnel_interface
+                            << " listening on " << ctx.nqueues << " queues";
 
     // Create the client-side Tunnel device
-    TunCtl tunnel("rpic", ctx.nqueues);
+    TunCtl tunnel(ctx.tunnel_interface, ctx.nqueues);
     TunnelProducerConsumer tunnelPC(tunnel.getQueues(), tunnel.getMTU());
     SocketProducerConsumer socketPC(true /* isClient */, tunnelPC);
     Client client(ctx, socketPC);
 
-    std::cout << "Rural Pipe running" << std::endl; // Indicates to the startup script that the
-                                                    // tunnel device has been created and that it
-                                                    // can configure the routing
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe client running";
+    ctx.signalReady();
     ctx.waitForExit();
 }
 

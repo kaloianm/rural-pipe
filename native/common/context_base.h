@@ -48,18 +48,25 @@ public:
     ShouldStart start(int argc, const char *argv[], CommandsServer::OnCommandFn onCommand);
 
     /**
+     * Indicates to the startup script that the tunnel device has been created and that it can start
+     * configuring the routing.
+     */
+    void signalReady();
+
+    /**
      * Blocks until `exit` below is called.
      */
     int waitForExit();
 
     /**
      * Must be called in order to cause the process to terminate. Only the first invocation will be
-     * taken into account, the following ones will be ignored
+     * taken into account, any subsequent ones will be ignored.
      */
     void exit(int exitCode);
     void exit(const Exception &ex);
 
     // Common configuration options
+    std::string tunnel_interface;
     int nqueues;
 
 protected:

@@ -41,7 +41,8 @@ ContextBase::ContextBase(std::string serviceName)
     // clang-format off
     _desc.add_options()
         ("help", "Produces this help message")
-        ("settings.log", po::value<std::string>(), "The name of the log file to use. If missing, logging will be to the console.")
+        ("settings.log", po::value<std::string>(), "The name of the log file to use. If missing, all logging will be sent to the console.")
+        ("settings.tunnel_interface", po::value<std::string>(), "Name to use for the tunnel network interface")
         ("settings.nqueues", po::value<int>()->default_value(1), "Number of queues/threads to instantiate to listen on the tunnel device")
     ;
     // clang-format on
@@ -68,6 +69,7 @@ ContextBase::ShouldStart ContextBase::start(int argc, const char *argv[],
 
     po::notify(_vm);
 
+    tunnel_interface = _vm["settings.tunnel_interface"].as<std::string>();
     nqueues = _vm["settings.nqueues"].as<int>();
 
     // Initialise the logging system
@@ -97,6 +99,8 @@ ContextBase::ShouldStart ContextBase::start(int argc, const char *argv[],
 
     return kYes;
 }
+
+void ContextBase::signalReady() { std::cout << "Rural Pipe running" << std::endl; }
 
 int ContextBase::waitForExit() {
     std::unique_lock<std::mutex> ul(_mutex);
