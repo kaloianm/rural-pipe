@@ -21,22 +21,19 @@
 #include <boost/filesystem.hpp>
 #include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/log/utility/setup/common_attributes.hpp>
-#include <boost/log/utility/setup/console.hpp>
 #include <mutex>
 
 #include "common/exception.h"
 #include "common/socket_producer_consumer.h"
 #include "common/tunnel_producer_consumer.h"
+#include "test/test.h"
 
 namespace ruralpi {
-namespace server {
+namespace test {
 namespace {
 
-namespace logging = boost::log;
 namespace fs = boost::filesystem;
 
-#define LOG BOOST_LOG_TRIVIAL(info)
 #define DATA_AND_SIZE(x) x, sizeof(x) + 1
 #define CHECK(x) RASSERT(x)
 
@@ -53,74 +50,76 @@ struct TestFifo {
           }()) {}
 };
 
-void tunnelFrameTests() {
+BOOST_AUTO_TEST_SUITE(TunnelFrameTests)
+
+BOOST_AUTO_TEST_CASE(Tests) {
     uint8_t buffer[2 * kTunnelFrameMaxSize];
     memset(buffer, 0xAA, sizeof(buffer));
 
     {
-        LOG << "Small size datagram write";
+        TLOG << "Small size datagram write";
         TunnelFrameWriter writer({buffer, kTunnelFrameMaxSize});
-        LOG << writer.remainingBytes();
+        TLOG << writer.remainingBytes();
         CHECK(writer.remainingBytes() == 3936); // Header + Separator
         writer.append("DG1");
-        LOG << writer.remainingBytes();
+        TLOG << writer.remainingBytes();
         writer.append("DG2");
-        LOG << writer.remainingBytes();
+        TLOG << writer.remainingBytes();
         writer.header().seqNum = 0;
         writer.close();
         CHECK(writer.buffer().size > 0);
-        LOG << writer.buffer().size << ": " << (int)writer.buffer().data[writer.buffer().size];
+        TLOG << writer.buffer().size << ": " << (int)writer.buffer().data[writer.buffer().size];
         CHECK(writer.buffer().data[writer.buffer().size] == 0xAA);
     }
     {
-        LOG << "Small size datagram read";
+        TLOG << "Small size datagram read";
         TunnelFrameReader reader(ConstTunnelFrameBuffer{buffer, kTunnelFrameMaxSize});
         CHECK(reader.header().seqNum == 0);
         CHECK(reader.next());
-        LOG << reader.size() << ": " << (char *)reader.data();
+        TLOG << reader.size() << ": " << (char *)reader.data();
         CHECK(reader.next());
-        LOG << reader.size() << ": " << (char *)reader.data();
+        TLOG << reader.size() << ": " << (char *)reader.data();
         CHECK(!reader.next());
     }
     {
-        LOG << "Max size datagram write";
+        TLOG << "Max size datagram write";
         TunnelFrameWriter writer({buffer, kTunnelFrameMaxSize});
-        LOG << writer.remainingBytes();
+        TLOG << writer.remainingBytes();
         writer.append(std::string(128, '-'));
-        LOG << writer.remainingBytes();
+        TLOG << writer.remainingBytes();
         writer.append(std::string(writer.remainingBytes(), '*'));
-        LOG << writer.remainingBytes();
+        TLOG << writer.remainingBytes();
         writer.header().seqNum = 1;
         writer.close();
-        LOG << writer.buffer().size;
+        TLOG << writer.buffer().size;
         CHECK(writer.buffer().size == kTunnelFrameMaxSize);
         CHECK(writer.buffer().data[kTunnelFrameMaxSize] == 0xAA);
     }
     {
-        LOG << "Max size datagram read";
+        TLOG << "Max size datagram read";
         TunnelFrameReader reader(ConstTunnelFrameBuffer{buffer, kTunnelFrameMaxSize});
         CHECK(reader.header().seqNum == 1);
         CHECK(reader.next());
-        LOG << reader.size();
+        TLOG << reader.size();
         CHECK(reader.next());
-        LOG << reader.size();
+        TLOG << reader.size();
         CHECK(!reader.next());
     }
     {
-        LOG << "Empty datagram write";
+        TLOG << "Empty datagram write";
         TunnelFrameWriter writer({buffer, kTunnelFrameMaxSize});
         writer.header().seqNum = 2;
         writer.close();
-        LOG << writer.buffer().size;
+        TLOG << writer.buffer().size;
     }
     {
-        LOG << "Empty datagram read";
+        TLOG << "Empty datagram read";
         TunnelFrameReader reader(ConstTunnelFrameBuffer{buffer, kTunnelFrameMaxSize});
         CHECK(reader.header().seqNum == 2);
         CHECK(!reader.next());
     }
     {
-        LOG << "Random writes";
+        TLOG << "Random writes";
         for (int i = 0; i < 5000; i++) {
             TunnelFrameWriter writer({buffer, kTunnelFrameMaxSize});
             for (int numDatagramsToWrite = std::max(5, rand() % 1000);
@@ -133,7 +132,11 @@ void tunnelFrameTests() {
     }
 }
 
-void tunnelFrameStreamTests() {
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(TunnelFrameStreamTests)
+
+BOOST_AUTO_TEST_CASE(Tests) {
     int fd;
     TunnelFrameStream stream([&] {
         TestFifo pipe;
@@ -157,7 +160,7 @@ void tunnelFrameStreamTests() {
         TunnelFrameReader reader(stream.receive());
         CHECK(reader.header().seqNum == 0);
         CHECK(reader.next());
-        LOG << (char *)reader.data();
+        TLOG << (char *)reader.data();
         CHECK(!reader.next());
     }
 
@@ -171,7 +174,7 @@ void tunnelFrameStreamTests() {
         }
         writer.header().seqNum = 0;
         writer.close();
-        LOG << "Size " << writer.buffer().size;
+        TLOG << "Size " << writer.buffer().size;
         CHECK(write(fd, writer.buffer().data, 100) == 100);
         CHECK(write(fd, writer.buffer().data + 100, writer.buffer().size - 100) ==
               writer.buffer().size - 100);
@@ -180,13 +183,17 @@ void tunnelFrameStreamTests() {
         CHECK(reader.header().seqNum == 0);
         for (int i = 0; i < 10; i++) {
             CHECK(reader.next());
-            LOG << (char *)reader.data();
+            TLOG << (char *)reader.data();
         }
         CHECK(!reader.next());
     }
 }
 
-void tunnelProducerConsumerTests() {
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(TunnelProducerConsumerTests)
+
+BOOST_AUTO_TEST_CASE(Tests) {
     TestFifo pipes[2];
     TunnelProducerConsumer tunnelPC(std::vector<FileDescriptor>{pipes[0].fd, pipes[1].fd}, 1500);
 
@@ -198,7 +205,7 @@ void tunnelProducerConsumerTests() {
         ~TestPipe() { pipePop(); }
 
         void onTunnelFrameReady(TunnelFrameBuffer buf) override {
-            LOG << "Received tunnel frame of " << buf.size << " bytes";
+            TLOG << "Received tunnel frame of " << buf.size << " bytes";
 
             std::lock_guard<std::mutex> lg(mutex);
             memcpy(lastFrameReceived, buf.data, buf.size);
@@ -217,25 +224,29 @@ void tunnelProducerConsumerTests() {
         size_t lastFrameReceivedSize{0};
     } testPipe(tunnelPC);
 
-    LOG << "Sending datagrams on file descriptors " << pipes[0].fd << " & " << pipes[1].fd;
+    TLOG << "Sending datagrams on file descriptors " << pipes[0].fd << " & " << pipes[1].fd;
     CHECK(pipes[0].fd.write(DATA_AND_SIZE("DG1.1")) > 0);
     CHECK(pipes[1].fd.write(DATA_AND_SIZE("DG2.1")) > 0);
 
     while (testPipe.getNumFramesReceived() < 2)
         ::sleep(1);
 
-    LOG << "Parsing the last received tunnel frame";
+    TLOG << "Parsing the last received tunnel frame";
 
     TunnelFrameReader reader(
         ConstTunnelFrameBuffer{testPipe.lastFrameReceived, testPipe.lastFrameReceivedSize});
     CHECK(reader.next());
-    LOG << (char *)reader.data();
+    TLOG << (char *)reader.data();
     CHECK(!reader.next());
 
     testPipe.pipeInvokePrev({testPipe.lastFrameReceived, testPipe.lastFrameReceivedSize});
 }
 
-void socketProducerConsumerTests() {
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(SocketProducerConsumerTests)
+
+BOOST_AUTO_TEST_CASE(Tests) {
     struct TestPipe : public TunnelFramePipe {
         TestPipe() : TunnelFramePipe("socketProducerConsumerTests") {}
 
@@ -248,51 +259,8 @@ void socketProducerConsumerTests() {
     socketPC.addSocket(SocketProducerConsumer::SocketConfig{std::move(pipe.fd)});
 }
 
-void serverTestsMain() {
-    logging::add_console_log(std::cout,
-                             boost::log::keywords::format = "[%ThreadID% (%Scope%)] %Message%");
-
-    logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
-
-    logging::add_common_attributes();
-    logging::core::get()->add_global_attribute("Scope", boost::log::attributes::named_scope());
-
-    {
-        BOOST_LOG_NAMED_SCOPE("tunnelFrameTests");
-        BOOST_LOG_TRIVIAL(info) << "Running tunnelFrameTests ...";
-        tunnelFrameTests();
-    }
-
-    {
-        BOOST_LOG_NAMED_SCOPE("tunnelFrameStreamTests");
-        BOOST_LOG_TRIVIAL(info) << "Running tunnelFrameStreamTests ...";
-        tunnelFrameStreamTests();
-    }
-
-    {
-        BOOST_LOG_NAMED_SCOPE("tunnelProducerConsumerTests");
-        BOOST_LOG_TRIVIAL(info) << "Running tunnelProducerConsumerTests ...";
-        tunnelProducerConsumerTests();
-    }
-
-    {
-        BOOST_LOG_NAMED_SCOPE("socketProducerConsumerTests");
-        BOOST_LOG_TRIVIAL(info) << "Running socketProducerConsumerTests ...";
-        socketProducerConsumerTests();
-    }
-
-    BOOST_LOG_TRIVIAL(info) << "All tests succeeded!";
-}
+BOOST_AUTO_TEST_SUITE_END()
 
 } // namespace
-} // namespace server
+} // namespace test
 } // namespace ruralpi
-
-int main(int argc, const char *argv[]) {
-    try {
-        ruralpi::server::serverTestsMain();
-    } catch (const std::exception &ex) {
-        BOOST_LOG_TRIVIAL(fatal) << "Error occurred: " << ex.what();
-        return 1;
-    }
-}

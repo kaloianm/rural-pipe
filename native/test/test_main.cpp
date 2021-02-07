@@ -1,5 +1,5 @@
 /**
- * Copyright 2020 Kaloian Manassiev
+ * Copyright 2021 Kaloian Manassiev
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  * associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -18,44 +18,36 @@
 
 #include "common/base.h"
 
-#include "common/ip_parsers.h"
+#define BOOST_TEST_MAIN
+#define BOOST_TEST_MODULE Main
+#include "test/test.h"
 
-#include <sstream>
+#include <boost/log/attributes/named_scope.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/log/utility/setup/console.hpp>
 
 namespace ruralpi {
+namespace test {
+namespace {
 
-namespace asio = boost::asio;
+namespace logging = boost::log;
 
-std::string ICMP::toString() const {
-    std::stringstream ss;
-    ss << " type: " << (int)type << " code: " << int(code);
-    return ss.str();
-}
+class LoggingInitialisation {
+public:
+    LoggingInitialisation() {
+        logging::add_console_log(std::cout,
+                                 boost::log::keywords::format = "[%ThreadID% (%Scope%)] %Message%");
 
-std::string TCP::toString() const {
-    std::stringstream ss;
-    ss << " sport: " << ntohs(source) << " dport: " << ntohs(dest) << " seq: " << ntohl(th_seq);
-    return ss.str();
-}
+        logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
 
-std::string UDP::toString() const {
-    std::stringstream ss;
-    ss << " sport: " << ntohs(source) << " dport: " << ntohs(dest) << " len: " << ntohs(len);
-    return ss.str();
-}
+        logging::add_common_attributes();
+        logging::core::get()->add_global_attribute("Scope", boost::log::attributes::named_scope());
+    }
+};
 
-std::string SSCOPMCE::toString() const {
-    std::stringstream ss;
-    ss << "";
-    return ss.str();
-}
+BOOST_GLOBAL_FIXTURE(LoggingInitialisation);
 
-std::string IP::toString() const {
-    std::stringstream ss;
-    ss << " id: " << ntohs(id) << " proto: " << (int)protocol
-       << " src: " << asio::ip::address_v4(ntohl(saddr))
-       << " dst: " << asio::ip::address_v4(ntohl(daddr)) << " len: " << ntohs(tot_len);
-    return ss.str();
-}
-
+} // namespace
+} // namespace test
 } // namespace ruralpi

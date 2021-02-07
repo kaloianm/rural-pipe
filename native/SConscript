@@ -18,73 +18,112 @@
 import os
 
 Import('env')
+
 native_env = env.Clone()
 native_env.Append(CPPPATH=[native_env.Dir('.').srcnode()])
 native_env.Append(CXXFLAGS=['-std=c++14'])
 native_env.Append(CPPDEFINES=['BOOST_FILESYSTEM_NO_DEPRECATED'])
 
 
-def MakeCommonNativeEnv(arch_name):
-    arch = native_env[arch_name]
+# Builds all the Boost libraries used by any of the targets
+class Boost:
+    def __init__(self, arch_name):
+        arch = native_env[arch_name]
 
-    # Boost configuration
-    boost_library_names = [
-        'boost_atomic',
-        'boost_chrono',
-        'boost_log_setup',
-        'boost_log',
-        'boost_filesystem',
-        'boost_program_options',
-        'boost_regex',
-        'boost_thread',
-    ]
+        boost_library_names = [
+            'boost_atomic',
+            'boost_chrono',
+            'boost_log_setup',
+            'boost_log',
+            'boost_filesystem',
+            'boost_program_options',
+            'boost_regex',
+            'boost_thread',
+        ]
 
-    boost_install_directory = native_env.Dir(arch['arch']).abspath
+        boost_test_library_names = [
+            'boost_unit_test_framework',
+            'boost_test_exec_monitor',
+        ]
 
-    boost = native_env.Command(
-        list(
+        boost_install_directory = native_env.Dir(arch['arch']).abspath
+
+        self.include_path = native_env.Dir(os.path.join(boost_install_directory, 'boost',
+                                                        'include'))
+        self.lib_path = native_env.Dir(os.path.join(boost_install_directory, 'boost', 'lib'))
+        self.libs = native_env.Command(
+            list(
+                map(
+                    lambda lib: native_env.File(
+                        os.path.join(boost_install_directory, 'boost', 'lib', 'lib' + lib + '.a')),
+                    boost_library_names)),
+            native_env.File('make_boost_for_platform.sh'),
+            [
+                '{script_path} {install_directory} {boost_version} {compiler_prefix} > boost_for_{arch}_build.log'
+                .format(
+                    script_path=str(native_env.File('make_boost_for_platform.sh')),
+                    install_directory=boost_install_directory,
+                    boost_version=ARGUMENTS.get('BOOST_VERSION', '1.74.0'),
+                    compiler_prefix=arch['prefix'],
+                    arch=arch['arch'],
+                ),
+            ],
+        )
+        self.test_libs = list(
             map(
                 lambda lib: native_env.File(
                     os.path.join(boost_install_directory, 'boost', 'lib', 'lib' + lib + '.a')),
-                boost_library_names)),
-        native_env.File('make_boost_for_platform.sh'),
-        [
-            '{script_path} {install_directory} {boost_version} {compiler_prefix} > boost_for_{arch}_build.log'
-            .format(
-                script_path=str(native_env.File('make_boost_for_platform.sh')),
-                install_directory=boost_install_directory,
-                boost_version=ARGUMENTS.get('BOOST_VERSION', '1.74.0'),
-                compiler_prefix=arch['prefix'],
-                arch=arch['arch'],
-            ),
-        ],
-    )
+                boost_test_library_names))
 
-    # Common environment configuration
+
+# Build the Boost libraries first, since they are prerequisite for everything else
+boost_client = Boost('CLIENT_ARCH')
+if native_env['SERVER_ARCH'] != native_env['CLIENT_ARCH']:
+    boost_server = Boost('SERVER_ARCH')
+else:
+    boost_server = boost_client
+
+
+def MakeCommonNativeEnv(arch_name, boost):
+    arch = native_env[arch_name]
+
     env = native_env.Clone()
-    env.Append(CPPPATH=[native_env.Dir(os.path.join(boost_install_directory, 'boost', 'include'))])
-    env.Append(LIBPATH=[
-        os.path.join(boost_install_directory, 'boost', 'lib'),
+
+    env.Append(CPPPATH=[
+        boost.include_path,
     ])
-    env.Append(LIBS=['pthread'])
+    env.Append(LIBPATH=[
+        boost.lib_path,
+    ])
+    env.Append(LIBS=[
+        'pthread',
+    ])
 
     for (tool, name) in [
         ('CXX', 'g++'),
     ]:
         env[tool] = arch['prefix'] + name
 
-    # Build the common library
-    common = SConscript('common/SConscript', variant_dir=os.path.join(arch['arch'], 'common'),
-                        exports='env', duplicate=0)
-    env.Append(LIBS=[common, boost])
+    # Common library
+    common = SConscript('common/SConscript',
+                        variant_dir=env.Dir(os.path.join(arch['arch'],
+                                                         'common')), exports='env', duplicate=0)
+    env.Append(LIBS=[common, boost.libs])
+
+    # Unit-tests
+    test_env = env.Clone()
+    test_env.Append(LIBS=[boost.test_libs])
+    SConscript('test/SConscript', variant_dir=env.Dir(os.path.join(arch['arch'], 'test')),
+               exports='test_env', duplicate=0)
+
     return env
 
 
 # Build the Client
-env = MakeCommonNativeEnv('CLIENT_ARCH')
+env = MakeCommonNativeEnv('CLIENT_ARCH', boost_client)
 SConscript('client/SConscript', exports='env', duplicate=0)
 
 # Build the Server
 if native_env['SERVER_ARCH'] != native_env['CLIENT_ARCH']:
-    env = MakeCommonNativeEnv('SERVER_ARCH')
+    env = MakeCommonNativeEnv('SERVER_ARCH', boost_server)
 SConscript('server/SConscript', exports='env', duplicate=0)

@@ -48,3 +48,4 @@ pushd $BOOST_ROOT
 ./bootstrap.sh --with-libraries=log,program_options
 echo "using gcc : platform : /usr/bin/${PLATFORM_PREFIX}g++ : <cxxflags>-std=c++14 ;" > ./tools/build/src/user-config.jam
 ./b2 -d+2 --prefix=$INSTALL_DIR/boost --exec-prefix=$INSTALL_DIR/boost toolset=gcc-platform link=static install
+./b2 -d+2 --with-test --prefix=$INSTALL_DIR/boost --exec-prefix=$INSTALL_DIR/boost toolset=gcc-platform link=static install

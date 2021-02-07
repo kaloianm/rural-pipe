@@ -1,5 +1,5 @@
 /**
- * Copyright 2020 Kaloian Manassiev
+ * Copyright 2021 Kaloian Manassiev
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  * associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -16,46 +16,14 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
-#include "common/base.h"
+#pragma once
 
-#include "common/ip_parsers.h"
-
-#include <sstream>
+#include <boost/test/unit_test.hpp>
 
 namespace ruralpi {
+namespace test {
 
-namespace asio = boost::asio;
+#define TLOG BOOST_LOG_TRIVIAL(info)
 
-std::string ICMP::toString() const {
-    std::stringstream ss;
-    ss << " type: " << (int)type << " code: " << int(code);
-    return ss.str();
-}
-
-std::string TCP::toString() const {
-    std::stringstream ss;
-    ss << " sport: " << ntohs(source) << " dport: " << ntohs(dest) << " seq: " << ntohl(th_seq);
-    return ss.str();
-}
-
-std::string UDP::toString() const {
-    std::stringstream ss;
-    ss << " sport: " << ntohs(source) << " dport: " << ntohs(dest) << " len: " << ntohs(len);
-    return ss.str();
-}
-
-std::string SSCOPMCE::toString() const {
-    std::stringstream ss;
-    ss << "";
-    return ss.str();
-}
-
-std::string IP::toString() const {
-    std::stringstream ss;
-    ss << " id: " << ntohs(id) << " proto: " << (int)protocol
-       << " src: " << asio::ip::address_v4(ntohl(saddr))
-       << " dst: " << asio::ip::address_v4(ntohl(daddr)) << " len: " << ntohs(tot_len);
-    return ss.str();
-}
-
+} // namespace test
 } // namespace ruralpi
