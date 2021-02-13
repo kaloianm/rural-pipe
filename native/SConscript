@@ -24,11 +24,23 @@ native_env.Append(CPPPATH=[native_env.Dir('.').srcnode()])
 native_env.Append(CXXFLAGS=['-std=c++14'])
 native_env.Append(CPPDEFINES=['BOOST_FILESYSTEM_NO_DEPRECATED'])
 
+architectures = native_env['ARCHITECTURES']
+
+client_architecture = native_env['CLIENT_ARCH']
+drivers_architecture = 'pi'
+server_architecture = native_env['SERVER_ARCH']
+tests_architecture = 'pc'
+
+print(
+    f'Native architectures: Client {client_architecture}, Drivers {drivers_architecture}, Server {server_architecture}, Tests {tests_architecture}'
+)
+
 
 # Builds all the Boost libraries used by any of the targets
 class Boost:
+    # The `arch_name` argument is one of the keys in the `architectures` map
     def __init__(self, arch_name):
-        arch = native_env[arch_name]
+        arch = architectures[arch_name]
 
         boost_library_names = [
             'boost_atomic',
@@ -75,55 +87,72 @@ class Boost:
                     os.path.join(boost_install_directory, 'boost', 'lib', 'lib' + lib + '.a')),
                 boost_test_library_names))
 
+    # Map from `arch_name` to `Boost` instances
+    instances = {}
 
-# Build the Boost libraries first, since they are prerequisite for everything else
-boost_client = Boost('CLIENT_ARCH')
-if native_env['SERVER_ARCH'] != native_env['CLIENT_ARCH']:
-    boost_server = Boost('SERVER_ARCH')
-else:
-    boost_server = boost_client
+    def get(arch_name):
+        if arch_name not in Boost.instances:
+            Boost.instances[arch_name] = Boost(arch_name)
+        return Boost.instances[arch_name]
 
 
-def MakeCommonNativeEnv(arch_name, boost):
-    arch = native_env[arch_name]
+# Constructs native environment for the specified architecture
+class CommonNativeEnvironment:
+    # The `arch_name` argument is one of the keys in the `architectures` map
+    def makeCommonNativeEnv(arch_name):
+        arch = architectures[arch_name]
+        boost = Boost.get(arch_name)
 
-    env = native_env.Clone()
+        env = native_env.Clone()
 
-    env.Append(CPPPATH=[
-        boost.include_path,
-    ])
-    env.Append(LIBPATH=[
-        boost.lib_path,
-    ])
-    env.Append(LIBS=[
-        'pthread',
-    ])
+        env.Append(CPPPATH=[
+            boost.include_path,
+        ])
+        env.Append(LIBPATH=[
+            boost.lib_path,
+        ])
+        env.Append(LIBS=[
+            'pthread',
+        ])
 
-    for (tool, name) in [
-        ('CXX', 'g++'),
-    ]:
-        env[tool] = arch['prefix'] + name
+        for (tool, name) in [
+            ('CC', 'gcc'),
+            ('CXX', 'g++'),
+        ]:
+            env[tool] = arch['prefix'] + name
 
-    # Common library
-    common = SConscript('common/SConscript',
-                        variant_dir=env.Dir(os.path.join(arch['arch'],
-                                                         'common')), exports='env', duplicate=0)
-    env.Append(LIBS=[common, boost.libs])
+        # Build the Common library
+        common = SConscript('common/SConscript',
+                            variant_dir=env.Dir(os.path.join(arch['arch'],
+                                                             'common')), exports='env', duplicate=0)
+        env.Append(LIBS=[common, boost.libs])
 
-    # Unit-tests
-    test_env = env.Clone()
-    test_env.Append(LIBS=[boost.test_libs])
-    SConscript('test/SConscript', variant_dir=env.Dir(os.path.join(arch['arch'], 'test')),
-               exports='test_env', duplicate=0)
+        return env
 
-    return env
+    # Map from `arch_name` to `Environment` instances
+    environments = {}
+
+    def get(arch_name):
+        if arch_name not in CommonNativeEnvironment.environments:
+            CommonNativeEnvironment.environments[
+                arch_name] = CommonNativeEnvironment.makeCommonNativeEnv(arch_name)
+        return CommonNativeEnvironment.environments[arch_name]
 
 
 # Build the Client
-env = MakeCommonNativeEnv('CLIENT_ARCH', boost_client)
+env = CommonNativeEnvironment.get(client_architecture)
 SConscript('client/SConscript', exports='env', duplicate=0)
 
+# Build the Drivers
+env = CommonNativeEnvironment.get(drivers_architecture)
+SConscript('drivers/SConscript', exports='env', duplicate=0)
+
 # Build the Server
-if native_env['SERVER_ARCH'] != native_env['CLIENT_ARCH']:
-    env = MakeCommonNativeEnv('SERVER_ARCH', boost_server)
+env = CommonNativeEnvironment.get(server_architecture)
 SConscript('server/SConscript', exports='env', duplicate=0)
+
+# Build the Tests
+boost_for_tests = Boost.get(tests_architecture)
+test_env = CommonNativeEnvironment.get(tests_architecture)
+test_env.Append(LIBS=[boost_for_tests.test_libs])
+SConscript('test/SConscript', exports='test_env', duplicate=0)

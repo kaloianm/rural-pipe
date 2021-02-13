@@ -21,7 +21,7 @@ import os
 # BEGIN: command-line options for the build
 #
 
-target_choices = {
+supported_architectures = {
     'pc': {
         'arch': 'pc',
         'prefix': ''
@@ -33,10 +33,10 @@ target_choices = {
 }
 
 AddOption('--client_arch', default='pc', dest='client_arch', type='choice',
-          choices=list(target_choices.keys()),
+          choices=list(supported_architectures.keys()),
           help='Use CLIENT_ARCH as the architecture for the client')
 AddOption('--server_arch', default='pc', dest='server_arch', type='choice',
-          choices=list(target_choices.keys()),
+          choices=list(supported_architectures.keys()),
           help='Use SERVER_ARCH as the architecture for the server')
 AddOption('--dbg', action='append_const', dest='cflags', const='-g -Og')
 AddOption('--opt', action='append_const', dest='cflags', const='-O3')
@@ -47,8 +47,9 @@ AddOption('--opt', action='append_const', dest='cflags', const='-O3')
 
 env = Environment(
     ENV=os.environ,
-    CLIENT_ARCH=target_choices[GetOption('client_arch')],
-    SERVER_ARCH=target_choices[GetOption('server_arch')],
+    ARCHITECTURES=supported_architectures,
+    CLIENT_ARCH=GetOption('client_arch'),
+    SERVER_ARCH=GetOption('server_arch'),
 )
 env.MergeFlags(GetOption('cflags'))
 
