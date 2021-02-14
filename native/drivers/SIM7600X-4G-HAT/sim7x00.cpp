@@ -29,26 +29,25 @@
 
 #include "arduPi.h"
 
-Sim7x00::Sim7x00() {}
+namespace {
 
-Sim7x00::~Sim7x00() {}
+// TODO: Globals
 
-/**************************Power on Sim7x00**************************/
-void Sim7x00::PowerOn(int PowerKey = powerkey) {
-    uint8_t answer = 0;
+} // namespace
 
+void Sim7x00::PowerOn(int powerKey) {
     Serial.begin(115200);
 
-    // checks if the module is started
-    answer = sendATcommand("AT", "OK", 2000);
+    uint8_t answer = sendATcommand("AT", "OK", 2000);
     if (answer == 0) {
         printf("Starting up...\n");
 
-        pinMode(PowerKey, OUTPUT);
+        pinMode(powerKey, OUTPUT);
+
         // power on pulse
-        digitalWrite(PowerKey, HIGH);
+        digitalWrite(powerKey, HIGH);
         delay(600);
-        digitalWrite(PowerKey, LOW);
+        digitalWrite(powerKey, LOW);
 
         // waits for an answer from the module
         while (answer == 0) { // Send AT every two seconds and wait for the answer
@@ -145,7 +144,6 @@ bool Sim7x00::ReceivingShortMessage() {
         RecMessage[i] = '\0';
 
         printf("%s\n", RecMessage);
-
     } else {
         printf("error %o\n", answer);
         return false;
@@ -194,7 +192,6 @@ void Sim7x00::DownloadFromFTP(const char *FileName) {
 
 /**************************GPS positoning**************************/
 bool Sim7x00::GPSPositioning() {
-
     uint8_t answer = 0;
     bool RecNull = true;
     int i = 0;

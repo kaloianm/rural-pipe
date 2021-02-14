@@ -33,8 +33,9 @@ int POWERKEY = 6;
 
 int8_t answer;
 
+const char Message[] = "Hello from RuralPipe !";
+
 /***********************Phone calls**********************/
-char text_message[] = "www.waveshare.com";
 char phone_number[] = "***";
 
 /***********************FTP upload and download***************************/
@@ -45,18 +46,19 @@ char download_file_name[] = "index3.htm";
 char upload_file_name[] = "index2.htm";
 
 /*********************TCP and UDP**********************/
-char APN[] = "CMNET";
+char APN[] = "mmsbouygtel.com";
 char aux_string[60];
-char ServerIP[] = "113.81.235.90";
-char Port[] = "1822";
+char ServerIP[] = "118.190.93.84";
+char Port[] = "2317";
 char RecMessage[20];
 char EndSending[10];
 int i = 0, j;
 
 void setup() {
     sim7600.PowerOn(POWERKEY);
+
     //  sim7600.PhoneCall(phone_number);
-    //  sim7600.SendingShortMessage(phone_number, text_message);
+    //  sim7600.SendingShortMessage(phone_number, Message);
     //  sim7600.ReceivingShortMessage();
     //  sim7600.ConfigureFTP(ftp_server,ftp_user_name,ftp_user_password);
     //  sim7600.UploadToFTP(upload_file_name);
@@ -84,24 +86,27 @@ void setup() {
 
     /*********************Enable PDP context******************/
     sim7600.sendATcommand("AT+CIPMODE=0", "OK", 1000);        // command mode,default:0
-    sim7600.sendATcommand("AT+NETOPEN", "+NETOPEN: 0", 1000); // Open network
+    sim7600.sendATcommand("AT+NETOPEN", "+NETOPEN: 0", 5000); // Open network
     sim7600.sendATcommand("AT+IPADDR", "+IPADDR:", 1000);     // Return IP address
-    //  sim7600.sendATcommand("AT+NETCLOSE", "OK", 1000); // Close network
 
     memset(aux_string, '\0', 30);
+
     /*********************TCP client in command mode******************/
     snprintf(aux_string, sizeof(aux_string), "AT+CIPOPEN=0,\"%s\",\"%s\",%s", "TCP", ServerIP,
              Port);
-    sim7600.sendATcommand(aux_string, "+CIPOPEN: 0,0", 1000); // Setting tcp mode、server ip and
+    sim7600.sendATcommand(aux_string, "+CIPOPEN: 0,0", 5000); // Setting tcp mode, server ip and
                                                               // port
-    //  Serial.println("AT+CIPSEND=0,5");                                   //Sending "Hello"
-    //to server.
-    sim7600.sendATcommand("AT+CIPSEND=0,", ">", 1000); // If not sure the message number,write the
+    // Serial.println("AT+CIPSEND=0,5");
+    // Sending Message to server.
+    sim7600.sendATcommand("AT+CIPSEND=0,", ">", 2000); // If not sure the message number,write the
                                                        // command like this: AT+CIPSEND=0, (end with
                                                        // 1A(hex))
-    Serial.println("HELLO");
-    sim7600.sendATcommand(",", "OK", 1000); // End of sending with 26(HEX:1A)
-    sim7600.sendATcommand("AT+CIPCLOSE=0", "+CIPCLOSE: 0,0", 15000); // close by local
+    Serial.println(Message);
+    if (sim7600.sendATcommand(",", "OK", 1000) == 1) { // End of sending with 26(HEX:1A)
+        printf("Send Message: \'%s\' successfully!\n", Message);
+    }
+
+    sim7600.sendATcommand("AT+CIPCLOSE=0", "+CIPCLOSE: 0,0", 15000); // Close by local
     sim7600.sendATcommand("AT+NETCLOSE", "+NETCLOSE: 0", 1000);      // Close network
 }
 

@@ -10,6 +10,7 @@
                 "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/12.0.0/include",
                 "/usr/local/include",
                 "${workspaceFolder}/native",
+                "${workspaceFolder}/native/drivers/bcm2835/include",
                 "${workspaceFolder}/build/native/pc/boost/include"
             ],
             "defines": [],
@@ -23,6 +24,7 @@
                     "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/12.0.0/include",
                     "/usr/local/include",
                     "${workspaceFolder}/native",
+                    "${workspaceFolder}/native/drivers/bcm2835/include",
                     "${workspaceFolder}/build/native/pc/boost/include"
                 ],
                 "limitSymbolsToIncludedHeaders": true,
@@ -41,6 +43,7 @@
                 "/usr/include",
                 "/usr/local/include",
                 "${workspaceFolder}/native",
+                "${workspaceFolder}/native/drivers/bcm2835/include",
                 "${workspaceFolder}/build/native/pc/boost/include"
             ],
             "defines": [],
@@ -50,6 +53,7 @@
                     "/usr/include",
                     "/usr/local/include",
                     "${workspaceFolder}/native",
+                    "${workspaceFolder}/native/drivers/bcm2835/include",
                     "${workspaceFolder}/build/native/pc/boost/include"
                 ],
                 "limitSymbolsToIncludedHeaders": true,

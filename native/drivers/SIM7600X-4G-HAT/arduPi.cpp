@@ -34,6 +34,51 @@ struct bcm2835_peripheral bsc_rev2 = {IOBASE + 0x804000};
 struct bcm2835_peripheral bsc0;
 volatile uint32_t *bcm2835_bsc01;
 
+#define BSC0_C *(bsc0.addr + 0x00)
+#define BSC0_S *(bsc0.addr + 0x01)
+#define BSC0_DLEN *(bsc0.addr + 0x02)
+#define BSC0_A *(bsc0.addr + 0x03)
+#define BSC0_FIFO *(bsc0.addr + 0x04)
+
+#define BSC_S_DONE (1 << 1)
+
+#define START_READ BSC_C_I2CEN | BSC_C_ST | BSC_C_CLEAR | BSC_C_READ
+#define START_WRITE BSC_C_I2CEN | BSC_C_ST
+
+#define CLEAR_STATUS BSC_S_CLKT | BSC_S_ERR | BSC_S_DONE
+
+#define GPFSEL0 *(gpio.addr + 0)
+#define GPFSEL1 *(gpio.addr + 1)
+#define GPFSEL2 *(gpio.addr + 2)
+#define GPFSEL3 *(gpio.addr + 3)
+#define GPFSEL4 *(gpio.addr + 4)
+#define GPFSEL5 *(gpio.addr + 5)
+// Reserved @ word offset 6
+#define GPSET0 *(gpio.addr + 7)
+#define GPSET1 *(gpio.addr + 8)
+// Reserved @ word offset 9
+#define GPCLR0 *(gpio.addr + 10)
+#define GPCLR1 *(gpio.addr + 11)
+// Reserved @ word offset 12
+#define GPLEV0 *(gpio.addr + 13)
+#define GPLEV1 *(gpio.addr + 14)
+
+#define BIT_4 (1 << 4)
+#define BIT_6 (1 << 6)
+#define BIT_8 (1 << 8)
+#define BIT_9 (1 << 9)
+#define BIT_10 (1 << 10)
+#define BIT_11 (1 << 11)
+#define BIT_14 (1 << 14)
+#define BIT_17 (1 << 17)
+#define BIT_18 (1 << 18)
+#define BIT_21 (1 << 21)
+#define BIT_27 (1 << 27)
+#define BIT_22 (1 << 22)
+#define BIT_23 (1 << 23)
+#define BIT_24 (1 << 24)
+#define BIT_25 (1 << 25)
+
 void *spi0 = MAP_FAILED;
 static uint8_t *spi0Mem = NULL;
 
@@ -622,7 +667,7 @@ WirePi::WirePi() {
         exit(1);
     }
 
-    bcm2835_bsc01 = mapmem("bsc1", BLOCK_SIZE, memfd, BCM2835_BSC1_BASE2);
+    bcm2835_bsc01 = mapmem("bsc1", BCM2835_BLOCK_SIZE, memfd, BCM2835_BSC1_BASE2);
     if (bcm2835_bsc01 == MAP_FAILED)
         exit(1);
 
@@ -632,7 +677,6 @@ WirePi::WirePi() {
 
 // Initiate the Wire library and join the I2C bus.
 void WirePi::begin() {
-
     volatile uint32_t *paddr = bcm2835_bsc01 + BCM2835_BSC_DIV / 4;
 
     // Set the I2C/BSC1 pins to the Alt 0 function to enable I2C access on them
@@ -890,7 +934,7 @@ int WirePi::map_peripheral(struct bcm2835_peripheral *p) {
         return -1;
     }
 
-    p->map = mmap(NULL, BLOCK_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED,
+    p->map = mmap(NULL, BCM2835_BLOCK_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED,
                   p->mem_fd, // File descriptor to physical memory virtual file '/dev/mem'
                   p->addr_p  // Address in physical map that we want this memory block to expose
     );
@@ -906,8 +950,7 @@ int WirePi::map_peripheral(struct bcm2835_peripheral *p) {
 }
 
 void WirePi::unmap_peripheral(struct bcm2835_peripheral *p) {
-
-    munmap(p->map, BLOCK_SIZE);
+    munmap(p->map, BCM2835_BLOCK_SIZE);
     ::close(p->mem_fd);
 }
 
@@ -937,17 +980,17 @@ SPIPi::SPIPi() {
 
     uint8_t *mapaddr;
 
-    if ((spi0Mem = (uint8_t *)malloc(BLOCK_SIZE + (PAGESIZE - 1))) == NULL) {
+    if ((spi0Mem = (uint8_t *)malloc(BCM2835_BLOCK_SIZE + (BCM2835_PAGE_SIZE - 1))) == NULL) {
         fprintf(stderr, "bcm2835_init: spi0Mem malloc failed: %s\n", strerror(errno));
         exit(1);
     }
 
     mapaddr = spi0Mem;
-    if (((uint32_t)mapaddr % PAGESIZE) != 0)
-        mapaddr += PAGESIZE - ((uint32_t)mapaddr % PAGESIZE);
+    if (((uint32_t)mapaddr % BCM2835_PAGE_SIZE) != 0)
+        mapaddr += BCM2835_PAGE_SIZE - ((uint32_t)mapaddr % BCM2835_PAGE_SIZE);
 
-    spi0 = (uint32_t *)mmap(mapaddr, BLOCK_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED,
-                            gpio.mem_fd, BCM2835_SPI0_BASE2);
+    spi0 = (uint32_t *)mmap(mapaddr, BCM2835_BLOCK_SIZE, PROT_READ | PROT_WRITE,
+                            MAP_SHARED | MAP_FIXED, gpio.mem_fd, BCM2835_SPI0_BASE2);
 
     if ((int32_t)spi0 < 0) {
         fprintf(stderr, "bcm2835_init: mmap failed (spi0): %s\n", strerror(errno));

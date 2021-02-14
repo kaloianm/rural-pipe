@@ -19,8 +19,7 @@
  *  Author: Sergio Martinez, Ruben Martin
  */
 
-#ifndef arduPi_h
-#define arduPi_h
+#pragma once
 
 #include <algorithm>
 #include <bcm2835.h>
@@ -47,54 +46,6 @@
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
-
-#define BSC0_C *(bsc0.addr + 0x00)
-#define BSC0_S *(bsc0.addr + 0x01)
-#define BSC0_DLEN *(bsc0.addr + 0x02)
-#define BSC0_A *(bsc0.addr + 0x03)
-#define BSC0_FIFO *(bsc0.addr + 0x04)
-
-#define BSC_S_DONE (1 << 1)
-
-#define START_READ BSC_C_I2CEN | BSC_C_ST | BSC_C_CLEAR | BSC_C_READ
-#define START_WRITE BSC_C_I2CEN | BSC_C_ST
-
-#define CLEAR_STATUS BSC_S_CLKT | BSC_S_ERR | BSC_S_DONE
-
-#define GPFSEL0 *(gpio.addr + 0)
-#define GPFSEL1 *(gpio.addr + 1)
-#define GPFSEL2 *(gpio.addr + 2)
-#define GPFSEL3 *(gpio.addr + 3)
-#define GPFSEL4 *(gpio.addr + 4)
-#define GPFSEL5 *(gpio.addr + 5)
-// Reserved @ word offset 6
-#define GPSET0 *(gpio.addr + 7)
-#define GPSET1 *(gpio.addr + 8)
-// Reserved @ word offset 9
-#define GPCLR0 *(gpio.addr + 10)
-#define GPCLR1 *(gpio.addr + 11)
-// Reserved @ word offset 12
-#define GPLEV0 *(gpio.addr + 13)
-#define GPLEV1 *(gpio.addr + 14)
-
-#define BIT_4 (1 << 4)
-#define BIT_6 (1 << 6)
-#define BIT_8 (1 << 8)
-#define BIT_9 (1 << 9)
-#define BIT_10 (1 << 10)
-#define BIT_11 (1 << 11)
-#define BIT_14 (1 << 14)
-#define BIT_17 (1 << 17)
-#define BIT_18 (1 << 18)
-#define BIT_21 (1 << 21)
-#define BIT_27 (1 << 27)
-#define BIT_22 (1 << 22)
-#define BIT_23 (1 << 23)
-#define BIT_24 (1 << 24)
-#define BIT_25 (1 << 25)
-
-#define PAGESIZE 4096
-#define BLOCK_SIZE 4096
 
 /// Defines for SPI
 /// GPIO register offsets from BCM2835_SPI0_BASE.
@@ -201,19 +152,6 @@ struct ThreadArg {
  * Class that provides the functionality of arduino Serial library
  */
 class SerialPi {
-private:
-    int sd, status;
-    const char *serialPort;
-    unsigned char c;
-    struct termios options;
-    int speed;
-    long timeOut;
-    timespec time1, time2;
-    timespec timeDiff(timespec start, timespec end);
-    char *int2bin(int i);
-    char *int2hex(int i);
-    char *int2oct(int i);
-
 public:
     SerialPi();
     void begin(int serialSpeed);
@@ -240,21 +178,25 @@ public:
     void flush();
     void setTimeout(long millis);
     void end();
+
+private:
+    int sd, status;
+    const char *serialPort;
+    unsigned char c;
+    struct termios options;
+    int speed;
+    long timeOut;
+    timespec time1, time2;
+    timespec timeDiff(timespec start, timespec end);
+    char *int2bin(int i);
+    char *int2hex(int i);
+    char *int2oct(int i);
 };
 
 /* WirePi Class
  * Class that provides the functionality of arduino Wire library
  */
 class WirePi {
-private:
-    int memfd;
-    int i2c_byte_wait_us;
-    int i2c_bytes_to_read;
-    void dump_bsc_status();
-    int map_peripheral(struct bcm2835_peripheral *p);
-    void unmap_peripheral(struct bcm2835_peripheral *p);
-    void wait_i2c_done();
-
 public:
     WirePi();
     void begin();
@@ -266,6 +208,15 @@ public:
     unsigned char read();
     uint8_t read(char *buf);
     uint8_t read_rs(char *regaddr, char *buf, uint32_t len);
+
+private:
+    int memfd;
+    int i2c_byte_wait_us;
+    int i2c_bytes_to_read;
+    void dump_bsc_status();
+    int map_peripheral(struct bcm2835_peripheral *p);
+    void unmap_peripheral(struct bcm2835_peripheral *p);
+    void wait_i2c_done();
 };
 
 class SPIPi {
@@ -314,5 +265,3 @@ void ch_peri_write_nb(volatile uint32_t *paddr, uint32_t value);
 void ch_peri_set_bits(volatile uint32_t *paddr, uint32_t value, uint32_t mask);
 void ch_gpio_fsel(uint8_t pin, uint8_t mode);
 void *threadFunction(void *args);
-
-#endif

@@ -25,21 +25,13 @@
  * THE SOFTWARE.
  */
 
-#ifndef sim7x00_h
-#define sim7x00_h
+#pragma once
 
 /* Sim7x00 Class */
 class Sim7x00 {
 public:
-    // Pin definition
-    static int powerkey;
-    int userkey;
-
-    Sim7x00();
-    ~Sim7x00();
-
     // SIM query
-    void PowerOn(int PowerKey);
+    void PowerOn(int powerKey);
 
     // Phone calls
     void PhoneCall(const char *PhoneNumber);
@@ -75,5 +67,3 @@ public:
 };
 
 extern Sim7x00 sim7600;
-
-#endif
