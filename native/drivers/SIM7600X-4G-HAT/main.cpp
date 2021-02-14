@@ -34,9 +34,8 @@ int POWERKEY = 6;
 int8_t answer;
 
 /***********************Phone calls**********************/
-// char phone_number[15];                          //Store the phone number you want to call
 char text_message[] = "www.waveshare.com";
-char phone_number[] = "15099940168"; // 15889529268
+char phone_number[] = "***";
 
 /***********************FTP upload and download***************************/
 char ftp_user_name[] = "**********";
@@ -56,12 +55,12 @@ int i = 0, j;
 
 void setup() {
     sim7600.PowerOn(POWERKEY);
-    //	sim7600.PhoneCall(phone_number);
-    //	sim7600.SendingShortMessage(phone_number,text_message);
-    //	sim7600.ReceivingShortMessage();
-    //	sim7600.ConfigureFTP(ftp_server,ftp_user_name,ftp_user_password);
-    //	sim7600.UploadToFTP(upload_file_name);
-    //	sim7600.DownloadFromFTP(download_file_name);
+    //  sim7600.PhoneCall(phone_number);
+    //  sim7600.SendingShortMessage(phone_number, text_message);
+    //  sim7600.ReceivingShortMessage();
+    //  sim7600.ConfigureFTP(ftp_server,ftp_user_name,ftp_user_password);
+    //  sim7600.UploadToFTP(upload_file_name);
+    //  sim7600.DownloadFromFTP(download_file_name);
     //  sim7600.GPSPositioning();
 
     /*************Network environment checking*************/
@@ -87,8 +86,7 @@ void setup() {
     sim7600.sendATcommand("AT+CIPMODE=0", "OK", 1000);        // command mode,default:0
     sim7600.sendATcommand("AT+NETOPEN", "+NETOPEN: 0", 1000); // Open network
     sim7600.sendATcommand("AT+IPADDR", "+IPADDR:", 1000);     // Return IP address
-    //	sim7600.sendATcommand("AT+NETCLOSE", "OK", 1000);					//Close
-    //network
+    //  sim7600.sendATcommand("AT+NETCLOSE", "OK", 1000); // Close network
 
     memset(aux_string, '\0', 30);
     /*********************TCP client in command mode******************/
@@ -96,8 +94,8 @@ void setup() {
              Port);
     sim7600.sendATcommand(aux_string, "+CIPOPEN: 0,0", 1000); // Setting tcp mode、server ip and
                                                               // port
-    //	Serial.println("AT+CIPSEND=0,5");									//Sending "Hello" to
-    //server.
+    //  Serial.println("AT+CIPSEND=0,5");                                   //Sending "Hello"
+    //to server.
     sim7600.sendATcommand("AT+CIPSEND=0,", ">", 1000); // If not sure the message number,write the
                                                        // command like this: AT+CIPSEND=0, (end with
                                                        // 1A(hex))

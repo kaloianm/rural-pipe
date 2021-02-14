@@ -32,7 +32,7 @@
 #include <poll.h>
 #include <pthread.h>
 #include <signal.h>
-#include <stdarg.h> //Include forva_start, va_arg and va_end strings functions
+#include <stdarg.h> // Include forva_start, va_arg and va_end strings functions
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,11 +46,7 @@
 #include <sys/wait.h>
 #include <termios.h>
 #include <time.h>
-
-#define IOBASE 0x3f000000
-#define GPIO_BASE2 (IOBASE + 0x200000)
-#define BCM2835_SPI0_BASE2 (IOBASE + 0x204000)
-#define BCM2835_BSC1_BASE2 (IOBASE + 0x804000)
+#include <unistd.h>
 
 #define BSC0_C *(bsc0.addr + 0x00)
 #define BSC0_S *(bsc0.addr + 0x01)
@@ -180,11 +176,6 @@ static int REV = 0;
 #define SPI_CLOCK_DIV2 2         ///< 2 = 6.25ns = 160MHz
 #define SPI_CLOCK_DIV1 1         ///< 0 = 256us = 4kHz
 
-namespace unistd {
-// All functions of unistd.h must be called like this: unistd::the_function()
-#include <unistd.h>
-}; // namespace unistd
-
 enum Representation { BIN, OCT, DEC, HEX, BYTE };
 
 typedef enum { INPUT, OUTPUT } Pinmode;
@@ -294,13 +285,6 @@ public:
 extern SerialPi Serial;
 extern WirePi Wire;
 extern SPIPi SPI;
-
-namespace ardupi {
-
-void delay(long millis);
-void delayMicroseconds(long micros);
-
-}; // namespace ardupi
 
 /* Some useful arduino functions */
 void pinMode(int pin, Pinmode mode);

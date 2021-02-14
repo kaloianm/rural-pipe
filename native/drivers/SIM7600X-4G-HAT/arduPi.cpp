@@ -21,9 +21,16 @@
 
 #include "arduPi.h"
 
+namespace {
+
+const uint64_t IOBASE = 0x3f000000;
+const uint64_t GPIO_BASE2 = IOBASE + 0x200000;
+const uint64_t BCM2835_SPI0_BASE2 = IOBASE + 0x204000;
+const uint64_t BCM2835_BSC1_BASE2 = IOBASE + 0x804000;
+
 struct bcm2835_peripheral gpio = {GPIO_BASE2};
-struct bcm2835_peripheral bsc_rev1 = {IOBASE + 0X205000};
-struct bcm2835_peripheral bsc_rev2 = {IOBASE + 0X804000};
+struct bcm2835_peripheral bsc_rev1 = {IOBASE + 0x205000};
+struct bcm2835_peripheral bsc_rev2 = {IOBASE + 0x804000};
 struct bcm2835_peripheral bsc0;
 volatile uint32_t *bcm2835_bsc01;
 
@@ -44,6 +51,38 @@ pthread_t idThread12;
 pthread_t idThread13;
 
 timeval start_program, end_point;
+
+namespace ardupi {
+
+// Sleep the specified milliseconds
+void delay(long millis) { ::usleep(millis * 1000); }
+
+void delayMicroseconds(long micros) {
+    if (micros > 100) {
+        struct timespec tim, tim2;
+        tim.tv_sec = 0;
+        tim.tv_nsec = micros * 1000;
+
+        if (::nanosleep(&tim, &tim2) < 0) {
+            fprintf(stderr, "Nano sleep system call failed \n");
+            exit(1);
+        }
+    } else {
+        struct timeval tNow, tLong, tEnd;
+
+        ::gettimeofday(&tNow, NULL);
+        tLong.tv_sec = micros / 1000000;
+        tLong.tv_usec = micros % 1000000;
+        timeradd(&tNow, &tLong, &tEnd);
+
+        while (timercmp(&tNow, &tEnd, <))
+            ::gettimeofday(&tNow, NULL);
+    }
+}
+
+} // namespace ardupi
+
+} // namespace
 
 /*********************************
  *                               *
@@ -149,14 +188,14 @@ void SerialPi::begin(int serialSpeed) {
 
     ioctl(sd, TIOCMSET, &status);
 
-    unistd::usleep(10000);
+    ::usleep(10000);
 }
 
 // Prints data to the serial port as human-readable ASCII text.
-void SerialPi::print(const char *message) { unistd::write(sd, message, strlen(message)); }
+void SerialPi::print(const char *message) { ::write(sd, message, strlen(message)); }
 
 // Prints data to the serial port as human-readable ASCII text.
-void SerialPi::print(char message) { unistd::write(sd, &message, 1); }
+void SerialPi::print(char message) { ::write(sd, &message, 1); }
 
 /*Prints data to the serial port as human-readable ASCII text.
  * It can print the message in many format representations such as:
@@ -167,22 +206,22 @@ void SerialPi::print(unsigned char i, Representation rep) {
 
     case BIN:
         message = int2bin(i);
-        unistd::write(sd, message, strlen(message));
+        ::write(sd, message, strlen(message));
         break;
     case OCT:
         message = int2oct(i);
-        unistd::write(sd, message, strlen(message));
+        ::write(sd, message, strlen(message));
         break;
     case DEC:
         sprintf(message, "%d", i);
-        unistd::write(sd, message, strlen(message));
+        ::write(sd, message, strlen(message));
         break;
     case HEX:
         message = int2hex(i);
-        unistd::write(sd, message, strlen(message));
+        ::write(sd, message, strlen(message));
         break;
     case BYTE:
-        unistd::write(sd, &i, 1);
+        ::write(sd, &i, 1);
         break;
     }
 }
@@ -202,7 +241,7 @@ sprintf(message,str3,f);
     */
     char message[10];
     sprintf(message, "%.1f", f);
-    unistd::write(sd, message, strlen(message));
+    ::write(sd, message, strlen(message));
 }
 
 /* Prints data to the serial port as human-readable ASCII text followed
@@ -211,7 +250,7 @@ void SerialPi::println(const char *message) {
     const char *newline = "\r\n";
     char *msg = NULL;
     asprintf(&msg, "%s%s", message, newline);
-    unistd::write(sd, msg, strlen(msg));
+    ::write(sd, msg, strlen(msg));
 }
 
 /* Prints data to the serial port as human-readable ASCII text followed
@@ -220,7 +259,7 @@ void SerialPi::println(char message) {
     const char *newline = "\r\n";
     char *msg = NULL;
     asprintf(&msg, "%s%s", &message, newline);
-    unistd::write(sd, msg, strlen(msg));
+    ::write(sd, msg, strlen(msg));
 }
 
 /* Prints data to the serial port as human-readable ASCII text followed
@@ -246,7 +285,7 @@ void SerialPi::println(int i, Representation rep) {
     const char *newline = "\r\n";
     char *msg = NULL;
     asprintf(&msg, "%s%s", message, newline);
-    unistd::write(sd, msg, strlen(msg));
+    ::write(sd, msg, strlen(msg));
 }
 
 /* Prints data to the serial port as human-readable ASCII text followed
@@ -263,13 +302,13 @@ void SerialPi::println(float f, int precission) {
     const char *newline = "\r\n";
     char *msg = NULL;
     asprintf(&msg, "%s%s", message, newline);
-    unistd::write(sd, msg, strlen(msg));
+    ::write(sd, msg, strlen(msg));
 }
 
 /* Writes binary data to the serial port. This data is sent as a byte
  * Returns: number of bytes written */
 int SerialPi::write(unsigned char message) {
-    unistd::write(sd, &message, 1);
+    ::write(sd, &message, 1);
     return 1;
 }
 
@@ -278,7 +317,7 @@ int SerialPi::write(unsigned char message) {
  * Returns: number of bytes written */
 int SerialPi::write(const char *message) {
     int len = strlen(message);
-    unistd::write(sd, &message, len);
+    ::write(sd, &message, len);
     return len;
 }
 
@@ -286,7 +325,7 @@ int SerialPi::write(const char *message) {
  * of bytes placed in an buffer. It needs the length of the buffer
  * Returns: number of bytes written */
 int SerialPi::write(char *message, int size) {
-    unistd::write(sd, message, size);
+    ::write(sd, message, size);
     return size;
 }
 
@@ -305,7 +344,7 @@ int SerialPi::available() {
 /* Reads 1 byte of incoming serial data
  * Returns: first byte of incoming serial data available */
 char SerialPi::read() {
-    unistd::read(sd, &c, 1);
+    ::read(sd, &c, 1);
     return c;
 }
 
@@ -317,7 +356,7 @@ int SerialPi::readBytes(char message[], int size) {
     int count;
     for (count = 0; count < size; count++) {
         if (available())
-            unistd::read(sd, &message[count], 1);
+            ::read(sd, &message[count], 1);
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time2);
         timespec t = timeDiff(time1, time2);
         if ((t.tv_nsec / 1000) > timeOut)
@@ -336,7 +375,7 @@ int SerialPi::readBytesUntil(char character, char buffer[], int length) {
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time1);
     while (count != length && lastReaded != character) {
         if (available())
-            unistd::read(sd, &buffer[count], 1);
+            ::read(sd, &buffer[count], 1);
         lastReaded = buffer[count];
         count++;
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time2);
@@ -368,7 +407,7 @@ bool SerialPi::findUntil(const char *target, const char *terminal) {
 
     do {
         if (available()) {
-            unistd::read(sd, &readed, 1);
+            ::read(sd, &readed, 1);
             if (readed != target[index])
                 index = 0; // reset index if any char does not match
 
@@ -409,7 +448,7 @@ long SerialPi::parseInt() {
             break;
         if (c >= '0' && c <= '9')
             break;
-        unistd::read(sd, &c, 1); // discard non-numeric
+        ::read(sd, &c, 1); // discard non-numeric
     } while (1);
 
     do {
@@ -417,7 +456,7 @@ long SerialPi::parseInt() {
             isNegative = true;
         else if (c >= '0' && c <= '9') // is c a digit?
             value = value * 10 + c - '0';
-        unistd::read(sd, &c, 1); // consume the character we got with peek
+        ::read(sd, &c, 1); // consume the character we got with peek
         c = peek();
 
     } while (c >= '0' && c <= '9');
@@ -441,7 +480,7 @@ float SerialPi::parseFloat() {
             break;
         if (c >= '0' && c <= '9')
             break;
-        unistd::read(sd, &c, 1); // discard non-numeric
+        ::read(sd, &c, 1); // discard non-numeric
     } while (1);
 
     do {
@@ -454,7 +493,7 @@ float SerialPi::parseFloat() {
             if (isFraction)
                 fraction *= 0.1;
         }
-        unistd::read(sd, &c, 1); // consume the character we got with peek
+        ::read(sd, &c, 1); // consume the character we got with peek
         c = peek();
     } while ((c >= '0' && c <= '9') || (c == '.' && isFraction == false));
 
@@ -480,7 +519,7 @@ char SerialPi::peek() {
 // Remove any data remaining on the serial buffer
 void SerialPi::flush() {
     while (available()) {
-        unistd::read(sd, &c, 1);
+        ::read(sd, &c, 1);
     }
 }
 
@@ -489,7 +528,7 @@ void SerialPi::flush() {
 void SerialPi::setTimeout(long millis) { timeOut = millis; }
 
 // Disables serial communication
-void SerialPi::end() { unistd::close(sd); }
+void SerialPi::end() { ::close(sd); }
 
 /*******************
  * Private methods *
@@ -626,7 +665,6 @@ void WirePi::write(char data) {
 
 // Writes data to the I2C.
 uint8_t WirePi::write(const char *buf, uint32_t len) {
-
     volatile uint32_t *dlen = bcm2835_bsc01 + BCM2835_BSC_DLEN / 4;
     volatile uint32_t *fifo = bcm2835_bsc01 + BCM2835_BSC_FIFO / 4;
     volatile uint32_t *status = bcm2835_bsc01 + BCM2835_BSC_S / 4;
@@ -870,14 +908,14 @@ int WirePi::map_peripheral(struct bcm2835_peripheral *p) {
 void WirePi::unmap_peripheral(struct bcm2835_peripheral *p) {
 
     munmap(p->map, BLOCK_SIZE);
-    unistd::close(p->mem_fd);
+    ::close(p->mem_fd);
 }
 
 void WirePi::wait_i2c_done() {
     // Wait till done, let's use a timeout just in case
     int timeout = 50;
     while ((!((BSC0_S)&BSC_S_DONE)) && --timeout) {
-        unistd::usleep(1000);
+        ::usleep(1000);
     }
     if (timeout == 0)
         printf("wait_i2c_done() timeout. Something went wrong.\n");
@@ -1064,36 +1102,6 @@ void ch_peri_set_bits(volatile uint32_t *paddr, uint32_t value, uint32_t mask) {
 }
 
 /********** FUNCTIONS OUTSIDE CLASSES **********/
-
-namespace ardupi {
-
-// Sleep the specified milliseconds
-void delay(long millis) { unistd::usleep(millis * 1000); }
-
-void delayMicroseconds(long micros) {
-    if (micros > 100) {
-        struct timespec tim, tim2;
-        tim.tv_sec = 0;
-        tim.tv_nsec = micros * 1000;
-
-        if (nanosleep(&tim, &tim2) < 0) {
-            fprintf(stderr, "Nano sleep system call failed \n");
-            exit(1);
-        }
-    } else {
-        struct timeval tNow, tLong, tEnd;
-
-        gettimeofday(&tNow, NULL);
-        tLong.tv_sec = micros / 1000000;
-        tLong.tv_usec = micros % 1000000;
-        timeradd(&tNow, &tLong, &tEnd);
-
-        while (timercmp(&tNow, &tEnd, <))
-            gettimeofday(&tNow, NULL);
-    }
-}
-
-} // namespace ardupi
 
 uint8_t shiftIn(uint8_t dPin, uint8_t cPin, bcm2835SPIBitOrder order) {
     uint8_t value = 0;
@@ -1619,7 +1627,6 @@ long millis() {
 /* Some helper functions */
 
 int getBoardRev() {
-
     FILE *cpu_info;
     char line[120];
     char *c, finalChar;
@@ -1769,7 +1776,7 @@ void *threadFunction(void *args) {
     pfd.fd = fd;
     pfd.events = POLLPRI;
 
-    ret = unistd::read(fd, rdbuf, RDBUF_LEN - 1);
+    ret = ::read(fd, rdbuf, RDBUF_LEN - 1);
     if (ret < 0) {
         perror("Error reading interrupt file\n");
         exit(1);
@@ -1777,18 +1784,18 @@ void *threadFunction(void *args) {
 
     while (1) {
         memset(rdbuf, 0x00, RDBUF_LEN);
-        unistd::lseek(fd, 0, SEEK_SET);
+        ::lseek(fd, 0, SEEK_SET);
         ret = poll(&pfd, 1, -1);
         if (ret < 0) {
             perror("Error waiting for interrupt\n");
-            unistd::close(fd);
+            ::close(fd);
             exit(1);
         }
         if (ret == 0) {
             printf("Timeout\n");
             continue;
         }
-        ret = unistd::read(fd, rdbuf, RDBUF_LEN - 1);
+        ret = ::read(fd, rdbuf, RDBUF_LEN - 1);
         if (ret < 0) {
             perror("Error reading interrupt file\n");
             exit(1);
