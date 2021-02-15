@@ -57,6 +57,11 @@ int i = 0, j;
 void setup() {
     sim7600.PowerOn(POWERKEY);
 
+    /*************Chip information *************/
+    sim7600.sendATcommand("AT+CGMI", 500);
+    sim7600.sendATcommand("AT+CGMM", 500);
+    sim7600.sendATcommand("AT+CPIN?", 500);
+
     //  sim7600.PhoneCall(phone_number);
     //  sim7600.SendingShortMessage(phone_number, Message);
     //  sim7600.ReceivingShortMessage();
@@ -66,7 +71,7 @@ void setup() {
     //  sim7600.GPSPositioning();
 
     /*************Network environment checking*************/
-    Serial.println("AT+CSQ");
+    sim7600.sendATcommand("AT+CSQ", 500);
     sim7600.sendATcommand("AT+CREG?", "+CREG: 0,1", 500);
     Serial.println("AT+CPSI?");
     sim7600.sendATcommand("AT+CGREG?", "+CGREG: 0,1", 500);
@@ -96,26 +101,18 @@ void setup() {
              Port);
     sim7600.sendATcommand(aux_string, "+CIPOPEN: 0,0", 5000); // Setting tcp mode, server ip and
                                                               // port
-    // Serial.println("AT+CIPSEND=0,5");
     // Sending Message to server.
-    sim7600.sendATcommand("AT+CIPSEND=0,", ">", 2000); // If not sure the message number,write the
-                                                       // command like this: AT+CIPSEND=0, (end with
-                                                       // 1A(hex))
+    sim7600.sendATcommand("AT+CIPSEND=0,23", ">", 2000);
     Serial.println(Message);
-    if (sim7600.sendATcommand(",", "OK", 1000) == 1) { // End of sending with 26(HEX:1A)
-        printf("Send Message: \'%s\' successfully!\n", Message);
-    }
+    sim7600.sendATcommand("+CIPSEND=0,23,23", 2000);
+
+    printf("\n");
 
     sim7600.sendATcommand("AT+CIPCLOSE=0", "+CIPCLOSE: 0,0", 15000); // Close by local
     sim7600.sendATcommand("AT+NETCLOSE", "+NETCLOSE: 0", 1000);      // Close network
 }
 
-void loop() {}
-
 int main() {
     setup();
-    while (1) {
-        loop();
-    }
     return (0);
 }

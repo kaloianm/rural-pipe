@@ -149,7 +149,6 @@ SerialPi::SerialPi() {
 
 // Sets the data rate in bits per second (baud) for serial data transmission
 void SerialPi::begin(int serialSpeed) {
-
     switch (serialSpeed) {
     case 50:
         speed = B50;
