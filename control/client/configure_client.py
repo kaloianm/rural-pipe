@@ -29,7 +29,7 @@ if os.geteuid() != 0:
          "Please try again, this time using 'sudo'. Exiting.")
 
 WAN = 'eth0'
-LAN = 'eth1'
+LAN = ['eth1', 'eth2']
 WLAN24GHZ = 'wlan0'
 TUNNEL = 'tun0'
 
@@ -101,7 +101,7 @@ def check_network_interfaces():
     if not lines[0].startswith('Iface'):
         raise Exception('Unexpected output: ', lines[0])
     interfaces = list(map(lambda itf: itf.split()[0], lines[1:]))
-    if not set([WAN, LAN, WLAN24GHZ]).issubset(set(interfaces)):
+    if not set([WAN] + LAN + [WLAN24GHZ]).issubset(set(interfaces)):
         raise Exception('Unable to find required interfaces')
 
 
@@ -131,12 +131,11 @@ iface lo inet loopback
 auto {WAN}
 iface {WAN} inet dhcp
 
-iface {LAN} inet manual
-iface {WLAN24GHZ} inet manual
+{''.join(map(lambda ifname: f'iface {ifname} inet manual' + chr(10), LAN + [WLAN24GHZ]))}
 
 auto br0
 iface br0 inet static
-  bridge_ports {LAN}
+  bridge_ports {''.join(map(lambda ifname: f'{ifname} ', LAN))}
   address 192.168.4.1
   broadcast 192.168.4.255
   netmask 255.255.255.0
