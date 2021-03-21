@@ -25,9 +25,11 @@
  * THE SOFTWARE.
  */
 
-#include "sim7x00.h"
+#include "common/base.h"
 
-#include "arduPi.h"
+#include "drivers/sim7600x/sim7x00.h"
+
+#include "drivers/sim7600x/arduPi.h"
 
 namespace {
 

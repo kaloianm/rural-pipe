@@ -33,4 +33,4 @@ drivers_architecture = 'pi'
 arch = architectures[drivers_architecture]
 
 env = drivers_env
-SConscript('SIM7600X-4G-HAT/SConscript', exports='env', duplicate=0)
+SConscript('sim7600x/SConscript', exports='env', duplicate=0)

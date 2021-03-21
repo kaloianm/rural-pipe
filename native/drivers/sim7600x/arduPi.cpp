@@ -19,7 +19,9 @@
  *  Author: Sergio Martinez, Ruben Martin
  */
 
-#include "arduPi.h"
+#include "common/base.h"
+
+#include "drivers/sim7600x/arduPi.h"
 
 namespace {
 
