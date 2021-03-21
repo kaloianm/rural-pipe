@@ -25,15 +25,27 @@
  * THE SOFTWARE.
  */
 
-#include "arduPi.h"
-#include "sim7x00.h"
+#include "common/base.h"
+
+#include "drivers/sim7600x/arduPi.h"
+#include "drivers/sim7600x/sim7x00.h"
 
 // Pin definition
 int POWERKEY = 6;
 
-int8_t answer;
-
-const char Message[] = "Hello from RuralPipe !";
+constexpr char Message[] =
+    "Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. "
+    "Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur "
+    "ridiculus mus. Donec quam felis, ultricies nec, pellentesque eu, pretium quis, sem. Nulla "
+    "consequat massa quis enim. Donec pede justo, fringilla vel, aliquet nec, vulputate eget, "
+    "arcu. In enim justo, rhoncus ut, imperdiet a, venenatis vitae, justo. Nullam dictum felis eu "
+    "pede mollis pretium. Integer tincidunt. Cras dapibus. Vivamus elementum semper nisi. Aenean "
+    "vulputate eleifend tellus. Aenean leo ligula, porttitor eu, consequat vitae, eleifend ac, "
+    "enim. Aliquam lorem ante, dapibus in, viverra quis, feugiat a, tellus. Phasellus viverra "
+    "nulla ut metus varius laoreet. Quisque rutrum. Aenean imperdiet. Etiam ultricies nisi vel "
+    "augue. Curabitur ullamcorper ultricies nisi. Nam eget dui. Etiam rhoncus. Maecenas tempus, "
+    "tellus eget condimentum rhoncus, sem quam semper libero, sit amet adipiscing sem neque sed "
+    "ipsum. Nam quam nunc, blandit vel, luctus pulvinar, hendrerit id, lorem.";
 
 /***********************Phone calls**********************/
 char phone_number[] = "***";
@@ -50,11 +62,8 @@ char APN[] = "mmsbouygtel.com";
 char aux_string[60];
 char ServerIP[] = "118.190.93.84";
 char Port[] = "2317";
-char RecMessage[20];
-char EndSending[10];
-int i = 0, j;
 
-void setup() {
+int main(int argc, char *argp[]) {
     sim7600.PowerOn(POWERKEY);
 
     /*************Chip information *************/
@@ -94,25 +103,18 @@ void setup() {
     sim7600.sendATcommand("AT+NETOPEN", "+NETOPEN: 0", 5000); // Open network
     sim7600.sendATcommand("AT+IPADDR", "+IPADDR:", 1000);     // Return IP address
 
-    memset(aux_string, '\0', 30);
-
     /*********************TCP client in command mode******************/
-    snprintf(aux_string, sizeof(aux_string), "AT+CIPOPEN=0,\"%s\",\"%s\",%s", "TCP", ServerIP,
-             Port);
+    ::snprintf(aux_string, sizeof(aux_string), "AT+CIPOPEN=0,\"%s\",\"%s\",%s", "TCP", ServerIP,
+               Port);
     sim7600.sendATcommand(aux_string, "+CIPOPEN: 0,0", 5000); // Setting tcp mode, server ip and
                                                               // port
     // Sending Message to server.
-    sim7600.sendATcommand("AT+CIPSEND=0,23", ">", 2000);
-    Serial.println(Message);
-    sim7600.sendATcommand("+CIPSEND=0,23,23", 2000);
+    sim7600.sendRequest(Message, sizeof(Message));
 
     printf("\n");
 
     sim7600.sendATcommand("AT+CIPCLOSE=0", "+CIPCLOSE: 0,0", 15000); // Close by local
     sim7600.sendATcommand("AT+NETCLOSE", "+NETCLOSE: 0", 1000);      // Close network
-}
 
-int main() {
-    setup();
     return (0);
 }

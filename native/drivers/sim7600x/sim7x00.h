@@ -49,15 +49,7 @@ public:
     bool GPSPositioning();
 
     // TCP and UDP communication
-    bool PDPSetting(const char *APN);
-
-    bool TCPClientCM(const char *ServerIP, const char *Port, const char *Message,
-                     const char *MessageSize);
-    bool TCPServerCM(const char *ServerIP, const char *Port, const char *Message,
-                     const char *MessageSize);
-
-    bool UDPServerCM(const char *ServerIP, const char *Port, const char *Message,
-                     const char *MessageSize);
+    bool sendRequest(const char request[], size_t len);
 
     // Other functions.
     char sendATcommand(const char *ATcommand, unsigned int timeout);

@@ -282,6 +282,20 @@ bool Sim7x00::GPSPositioning() {
     return true;
 }
 
+bool Sim7x00::sendRequest(const char request[], size_t len) {
+    char commandBuffer[1024];
+
+    ::snprintf(commandBuffer, sizeof(commandBuffer), "AT+CIPSEND=0,%d", len);
+    sim7600.sendATcommand(commandBuffer, ">", 2000);
+
+    Serial.write(request, len);
+
+    ::snprintf(commandBuffer, sizeof(commandBuffer), "+CIPSEND=0,%d,%d", len, len);
+    sim7600.sendATcommand(commandBuffer, 2000);
+
+    return true;
+}
+
 /**************************Other functions**************************/
 char Sim7x00::sendATcommand(const char *ATcommand, unsigned int timeout) {
     uint8_t x = 0, answer = 0;
