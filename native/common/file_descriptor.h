@@ -41,6 +41,7 @@ public:
     FileDescriptor(const FileDescriptor &);
     FileDescriptor(FileDescriptor &&);
 
+    int availableToRead();
     int read(void *buf, size_t nbytes);
     int write(void const *buf, size_t size);
 

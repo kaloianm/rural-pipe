@@ -63,16 +63,6 @@ public:
     using SystemException::SystemException;
 };
 
-#define SYSCALL_MSG(x, msg)                                                                        \
-    [&] {                                                                                          \
-        int res = x;                                                                               \
-        if (res < 0)                                                                               \
-            SystemException::throwFromErrno(msg);                                                  \
-        return res;                                                                                \
-    }()
-
-#define SYSCALL(x) SYSCALL_MSG(x, #x)
-
 class ScopedGuard {
     ScopedGuard(ScopedGuard &) = delete;
 
@@ -87,3 +77,13 @@ private:
 };
 
 } // namespace ruralpi
+
+#define SYSCALL_MSG(x, msg)                                                                        \
+    [&] {                                                                                          \
+        int res = x;                                                                               \
+        if (res < 0)                                                                               \
+            ruralpi::SystemException::throwFromErrno(msg);                                         \
+        return res;                                                                                \
+    }()
+
+#define SYSCALL(x) SYSCALL_MSG(x, #x)

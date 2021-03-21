@@ -42,6 +42,12 @@ FileDescriptor::FileDescriptor(FileDescriptor &&other) {
     other._fd = -1;
 }
 
+int FileDescriptor::availableToRead() {
+    int nAvailable;
+    SYSCALL(::ioctl(_fd, FIONREAD, &nAvailable));
+    return nAvailable;
+}
+
 int FileDescriptor::read(void *buf, size_t nbytes) {
     int res =
         SYSCALL_MSG(::read(_fd, buf, nbytes),

@@ -20,7 +20,7 @@ import os
 Import('env')
 
 SIM7600 = env.Library(
-    target='SIM7600-4G-HAT',
+    target='sim7600x',
     source=[
         'arduPi.cpp',
         'sim7x00.cpp',
