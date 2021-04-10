@@ -29,9 +29,10 @@ if os.geteuid() != 0:
          "Please try again, this time using 'sudo'. Exiting.")
 
 WAN = 'eth0'
+WWAN = 'wwan0'
 LAN = ['eth1', 'eth2']
 WLAN24GHZ = 'wlan0'
-TUNNEL = 'tun0'
+TUNNEL = 'rpic'
 
 parser = argparse.ArgumentParser(description="""
 This script performs all the necessary configuration steps for a clean-installed Raspberry Pi 4
@@ -83,6 +84,8 @@ def set_config_option(file_name, option):
                 line = f'{option_name}={option_value}'
                 option_set = True
             print(line, end='')
+        if at_first_line:
+            print(f"# THIS FILE {file_name} WAS MODIFIED BY RuralPupe's configure_client.py SCRIPT")
         if not option_set:
             with open(file_name, 'a') as file_name_input:
                 file_name_input.write(f'{option_name}={option_value}')
@@ -92,8 +95,8 @@ def set_config_option(file_name, option):
 # to obtain the latest versions of all packages.
 
 
-# 1. Check the list of available network interfaces contains at least the WAN, LAN and WLAN24GHZ
-# interfaces that the rest of the script depends on.
+# 1. Check the list of available network interfaces contains at least the WAN, WWAN, LAN and
+# WLAN24GHZ interfaces that the rest of the script depends on.
 def check_network_interfaces():
     p = subprocess.Popen(shlex.split('ifconfig -a -s'), stdout=subprocess.PIPE,
                          universal_newlines=True)
@@ -101,7 +104,7 @@ def check_network_interfaces():
     if not lines[0].startswith('Iface'):
         raise Exception('Unexpected output: ', lines[0])
     interfaces = list(map(lambda itf: itf.split()[0], lines[1:]))
-    if not set([WAN] + LAN + [WLAN24GHZ]).issubset(set(interfaces)):
+    if not set([WAN, WWAN] + LAN + [WLAN24GHZ]).issubset(set(interfaces)):
         raise Exception('Unable to find required interfaces')
 
 
@@ -115,7 +118,7 @@ shell_command(
     'echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections'
 )
 shell_command(
-    'apt install -y vim screen dnsmasq hostapd netfilter-persistent iptables-persistent bridge-utils openvpn libqmi-utils'
+    'apt install -y vim screen dnsmasq hostapd netfilter-persistent iptables-persistent bridge-utils openvpn libqmi-utils udhcpc'
 )
 
 # 2. Unblock the WLAN device(s) so they can transmit.
@@ -130,6 +133,15 @@ iface lo inet loopback
 
 auto {WAN}
 iface {WAN} inet dhcp
+
+iface {WWAN} inet manual
+  pre-up ifconfig {WWAN} down
+  pre-up for _ in $(seq 1 10); do test -c /dev/cdc-wdm0 && break; /bin/sleep 1; done
+  pre-up qmicli -d /dev/cdc-wdm0 --dms-set-operating-mode='online'
+  pre-up for _ in $(seq 1 10); do qmicli -d /dev/cdc-wdm0 --nas-get-signal-strength && break; /bin/sleep 1; done
+  pre-up qmi-network-raw /dev/cdc-wdm0 start
+  pre-up udhcpc -i {WWAN}
+  post-down qmi-network-raw /dev/cdc-wdm0 stop
 
 {''.join(map(lambda ifname: f'iface {ifname} inet manual' + chr(10), LAN + [WLAN24GHZ]))}
 
@@ -185,6 +197,7 @@ shell_command('sudo systemctl enable hostapd')
 # 6. Enable IP forwarding and NAT
 set_config_option('/etc/sysctl.conf', 'net.ipv4.ip_forward=1')
 shell_command(f'iptables -t nat -A POSTROUTING -o {WAN} -j MASQUERADE')
+shell_command(f'iptables -t nat -A POSTROUTING -o {WWAN} -j MASQUERADE')
 shell_command(f'iptables -t nat -A POSTROUTING -o {TUNNEL} -j MASQUERADE')
 shell_command('netfilter-persistent save')
 
