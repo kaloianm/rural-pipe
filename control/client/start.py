@@ -19,6 +19,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import asyncio
+import ipaddress
 import os
 import sys
 
@@ -27,17 +28,6 @@ from common import Service
 if os.geteuid() != 0:
     exit("You need to have root privileges to run this script.\n"
          "Please try again, this time using 'sudo'. Exiting.")
-
-
-async def start_client_and_wait(service):
-    options = service.options
-    ipcmd = await asyncio.create_subprocess_shell('ip route add default via ' +
-                                                  str(service.ip_iface.ip))
-    await ipcmd.wait()
-
-    print('Routing configured')
-
-    return await service.service_process.wait()
 
 
 class ClientService(Service):
@@ -51,16 +41,14 @@ class ClientService(Service):
         pass
 
     async def post_configure(self):
-        ipcmd = await asyncio.create_subprocess_shell('ip route add default via ' +
-                                                      str(self.ip_iface.ip))
+        ipcmd = await asyncio.create_subprocess_shell(
+            f'ip route change default via {str(self.ip_iface.ip)}')
         await ipcmd.wait()
 
 
 def main():
     os.chdir(sys.path[0])
-    service = ClientService()
-
-    sys.exit(asyncio.run(start_client_and_wait(service)))
+    ClientService()
 
 
 if __name__ == "__main__":

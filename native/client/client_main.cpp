@@ -21,6 +21,7 @@
 #include <boost/asio.hpp>
 #include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/uuid/random_generator.hpp>
 #include <sys/socket.h>
 
 #include "client/context.h"
@@ -34,6 +35,8 @@ namespace client {
 namespace {
 
 namespace asio = boost::asio;
+
+boost::uuids::basic_random_generator<boost::mt19937> uuidGen;
 
 class Client {
 public:
@@ -53,33 +56,31 @@ public:
                                 << " resolves to "
                                 << asio::ip::address_v4(ntohl(_serverAddr.sin_addr.s_addr)) << ":"
                                 << htons(_serverAddr.sin_port);
-
-        _thread = std::thread([this] {
-            BOOST_LOG_NAMED_SCOPE("clientControl");
-            while (true) {
-                try {
-                    _socketPC.addSocket(
-                        SocketProducerConsumer::SocketConfig{_connectToServer(_ctx.interfaces[0])});
-                    _ctx.waitForExit();
-                    break;
-                } catch (const ConnRefusedSystemException &ex) {
-                    BOOST_LOG_TRIVIAL(debug)
-                        << "Server not yet ready due to error: " << ex.what() << "; retrying ...";
-                    ::sleep(5);
-                } catch (const std::exception &ex) {
-                    BOOST_LOG_TRIVIAL(fatal) << "Client exited with error: " << ex.what();
-                    _ctx.exit(1);
-                    break;
-                }
-            }
-        });
     }
 
-    ~Client() {
-        if (_thread.joinable())
-            _thread.join();
+    ~Client() { BOOST_LOG_TRIVIAL(info) << "Client completed"; }
 
-        BOOST_LOG_TRIVIAL(info) << "Client completed";
+    void runConnectToServerLoop() {
+        BOOST_LOG_NAMED_SCOPE("clientControl");
+        while (true) {
+            try {
+                for (const auto &intf : _ctx.interfaces) {
+                    _socketPC.addSocket(
+                        SocketProducerConsumer::SocketConfig{_connectToServer(intf)});
+                }
+
+                _ctx.waitForExit();
+                break;
+            } catch (const ConnRefusedSystemException &ex) {
+                BOOST_LOG_TRIVIAL(debug)
+                    << "Server not yet ready due to error: " << ex.what() << "; retrying ...";
+                ::sleep(5);
+            } catch (const Exception &ex) {
+                BOOST_LOG_TRIVIAL(fatal) << "Client exited with error: " << ex.what();
+                _ctx.exit(1);
+                break;
+            }
+        }
     }
 
 private:
@@ -112,8 +113,6 @@ private:
 
     // Resolved server address
     const struct sockaddr_in _serverAddr;
-
-    std::thread _thread;
 };
 
 void clientMain(Context &ctx) {
@@ -125,12 +124,13 @@ void clientMain(Context &ctx) {
     // Create the client-side Tunnel device
     TunCtl tunnel(ctx.tunnel_interface, ctx.nqueues);
     TunnelProducerConsumer tunnelPC(tunnel.getQueues(), tunnel.getMTU());
-    SocketProducerConsumer socketPC(true /* isClient */, tunnelPC);
+    SocketProducerConsumer socketPC(uuidGen() /* clientSessionId */, tunnelPC);
     Client client(ctx, socketPC);
 
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe client running";
     ctx.signalReady();
-    ctx.waitForExit();
+
+    client.runConnectToServerLoop();
 }
 
 } // namespace

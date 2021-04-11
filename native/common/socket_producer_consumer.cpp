@@ -23,7 +23,6 @@
 #include <boost/asio.hpp>
 #include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
 #include "common/exception.h"
@@ -31,22 +30,21 @@
 namespace ruralpi {
 namespace {
 
-boost::uuids::basic_random_generator<boost::mt19937> uuidGen;
-
 struct InitialExchangeResult {
     std::string identifier;
     SessionId sessionId;
 };
 
-InitialExchangeResult initialTunnelFrameExchange(TunnelFrameStream &stream, bool isClient) {
+InitialExchangeResult initialTunnelFrameExchange(TunnelFrameStream &stream,
+                                                 const boost::optional<SessionId> clientSessionId) {
     uint8_t buffer[1024];
     memset(buffer, 0xAA, sizeof(buffer));
 
-    if (isClient) {
+    if (clientSessionId) {
         TunnelFrameWriter writer({buffer, sizeof(buffer)});
 
         // The client generates the session, the server just accepts it
-        writer.header().sessionId = uuidGen();
+        writer.header().sessionId = *clientSessionId;
         writer.header().seqNum = TunnelFrameHeader::kInitialSeqNum;
         strcpy(((char *)((InitTunnelFrame *)writer.data())->identifier), "RuralPipeClient");
         writer.onDatagramWritten(16);
@@ -79,8 +77,9 @@ InitialExchangeResult initialTunnelFrameExchange(TunnelFrameStream &stream, bool
 
 } // namespace
 
-SocketProducerConsumer::SocketProducerConsumer(bool isClient, TunnelFramePipe &prev)
-    : TunnelFramePipe("Socket"), _isClient(isClient) {
+SocketProducerConsumer::SocketProducerConsumer(boost::optional<SessionId> clientSessionId,
+                                               TunnelFramePipe &prev)
+    : TunnelFramePipe("Socket"), _clientSessionId(std::move(clientSessionId)) {
     _compresser.emplace(prev);
     _signer.emplace(*_compresser);
     pipePush(*_signer);
@@ -120,7 +119,7 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
         InitialExchangeResult ier;
 
         try {
-            ier = initialTunnelFrameExchange(s, _isClient);
+            ier = initialTunnelFrameExchange(s, _clientSessionId);
             BOOST_LOG_TRIVIAL(info) << "Initial exchange with " << ier.identifier << " : "
                                     << ier.sessionId << " successful";
         } catch (const std::exception &ex) {

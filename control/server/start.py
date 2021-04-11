@@ -25,6 +25,10 @@ import sys
 
 from common import Service
 
+if os.geteuid() != 0:
+    exit("You need to have root privileges to run this script.\n"
+         "Please try again, this time using 'sudo'. Exiting.")
+
 
 class ServerService(Service):
     def __init__(self):

@@ -70,7 +70,7 @@ private:
  */
 class SocketProducerConsumer : public TunnelFramePipe {
 public:
-    SocketProducerConsumer(bool isClient, TunnelFramePipe &prev);
+    SocketProducerConsumer(boost::optional<SessionId> clientSessionId, TunnelFramePipe &prev);
     ~SocketProducerConsumer();
 
     struct SocketConfig {
@@ -106,7 +106,7 @@ private:
     void _receiveFromSocketLoop(Session &session, TunnelFrameStream &stream);
 
     // Indicates whether this socket is run as a client or server
-    const bool _isClient;
+    const boost::optional<SessionId> _clientSessionId;
 
     // Passthrough pipes to sign and check signatures, compress and decompress the exchanged tunnel
     // frames

@@ -31,8 +31,8 @@ namespace po = boost::program_options;
 Context::Context() : ContextBase("client") {
     // clang-format off
     _desc.add_options()
-        ("settings.serverHost", po::value<std::string>()->required(), "Host on which the server is listening for connections")
-        ("settings.serverPort", po::value<int>()->default_value(50003), "Port on which the server is listening for connections")
+        ("settings.server_host", po::value<std::string>()->required(), "Host on which the server is listening for connections")
+        ("settings.server_port", po::value<int>()->default_value(50003), "Port on which the server is listening for connections")
         ("settings.interfaces", po::value<std::vector<std::string>>()->multitoken()->required(), "Set of interfaces through which to establish connections to the server")
     ;
     // clang-format on
@@ -44,8 +44,8 @@ Context::ShouldStart Context::start(int argc, const char *argv[]) {
     ShouldStart shouldStart = ContextBase::start(
         argc, argv, [this](int argc, const char *argv[]) { return _onCommand(argc, argv); });
     if (shouldStart == kYes) {
-        serverHost = _vm["settings.serverHost"].as<std::string>();
-        serverPort = _vm["settings.serverPort"].as<int>();
+        serverHost = _vm["settings.server_host"].as<std::string>();
+        serverPort = _vm["settings.server_port"].as<int>();
         interfaces = _vm["settings.interfaces"].as<std::vector<std::string>>();
     }
 

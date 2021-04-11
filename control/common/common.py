@@ -76,19 +76,19 @@ class Service:
             print(f'Service failed to start at pre-configuration due to {e}')
             raise
 
-        service_process = await asyncio.create_subprocess_exec(os.path.join(sys.path[0], self.name),
-                                                               stdin=asyncio.subprocess.PIPE,
-                                                               stdout=asyncio.subprocess.PIPE,
-                                                               stderr=asyncio.subprocess.STDOUT)
+        self.service_process = await asyncio.create_subprocess_exec(
+            os.path.join(sys.path[0], self.name), stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+
         try:
-            first_line = await service_process.stdout.readline()
+            first_line = await self.service_process.stdout.readline()
             if not first_line.decode().startswith('Rural Pipe running'):
                 raise Exception('Received unexpected response from the process:',
                                 first_line.decode())
         except Exception as e:
             print(f'Failed to start service due to {e}')
-            service_process.kill()
-            await service_process.wait()
+            self.service_process.kill()
+            await self.service_process.wait()
             raise
 
         print('Service started and active, configuring ...')
@@ -103,7 +103,7 @@ class Service:
 
         await self.post_configure()
 
-        await asyncio.gather(service_process.wait())
+        await asyncio.gather(self.service_process.wait())
 
     # Gives opportunity to the various service implementations to append their own custom options
     # to the parser arguments. This method must not throw.

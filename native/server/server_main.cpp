@@ -46,29 +46,19 @@ public:
         addr.sin_port = htons(ctx.port);
 
         SYSCALL(::bind(_serverSock, (sockaddr *)&addr, sizeof(addr)));
-
-        _thread = std::thread([this] {
-            BOOST_LOG_NAMED_SCOPE("serverControl");
-            try {
-                _acceptConnection();
-            } catch (const std::exception &ex) {
-                BOOST_LOG_TRIVIAL(fatal) << "Server exited with error: " << ex.what();
-                _ctx.exit(1);
-            }
-        });
     }
 
-    ~Server() {
-        if (_thread.joinable())
-            _thread.join();
+    ~Server() { BOOST_LOG_TRIVIAL(info) << "Server completed"; }
 
-        BOOST_LOG_TRIVIAL(info) << "Server completed";
-    }
-
-private:
-    void _acceptConnection() {
+    void runAcceptConnectionLoop() {
         while (true) {
-            SYSCALL(::listen(_serverSock, 1));
+            try {
+                SYSCALL(::listen(_serverSock, 1));
+            } catch (const Exception &ex) {
+                BOOST_LOG_TRIVIAL(error) << "Unable to listen due to error: " << ex.what();
+                ::sleep(5);
+                continue;
+            }
 
             try {
                 struct sockaddr_in addr;
@@ -87,13 +77,12 @@ private:
         }
     }
 
+private:
     Context &_ctx;
     SocketProducerConsumer &_socketPC;
 
     // Socket on which the server listens for connections
     ScopedFileDescriptor _serverSock;
-
-    std::thread _thread;
 };
 
 void serverMain(Context &ctx) {
@@ -105,12 +94,13 @@ void serverMain(Context &ctx) {
     // Create the server-side Tunnel device
     TunCtl tunnel(ctx.tunnel_interface, ctx.nqueues);
     TunnelProducerConsumer tunnelPC(tunnel.getQueues(), tunnel.getMTU());
-    SocketProducerConsumer socketPC(false /* isClient */, tunnelPC);
+    SocketProducerConsumer socketPC(boost::none /* clientSessionId */, tunnelPC);
     Server server(ctx, socketPC);
 
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe server running";
     ctx.signalReady();
-    ctx.waitForExit();
+
+    server.runAcceptConnectionLoop();
 }
 
 } // namespace

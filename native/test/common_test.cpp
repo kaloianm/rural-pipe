@@ -21,6 +21,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/uuid/random_generator.hpp>
 #include <mutex>
 
 #include "common/exception.h"
@@ -33,6 +34,8 @@ namespace test {
 namespace {
 
 namespace fs = boost::filesystem;
+
+boost::uuids::basic_random_generator<boost::mt19937> uuidGen;
 
 #define DATA_AND_SIZE(x) x, sizeof(x) + 1
 #define CHECK(x) RASSERT(x)
@@ -256,7 +259,7 @@ BOOST_AUTO_TEST_CASE(Tests) {
         void onTunnelFrameFromNext(TunnelFrameBuffer buf) override { RASSERT(false); }
     } testPipe;
 
-    SocketProducerConsumer socketPC(true /* isClient */, testPipe);
+    SocketProducerConsumer socketPC(uuidGen() /* clientSessionId */, testPipe);
 
     TestFifo pipe;
     socketPC.addSocket(SocketProducerConsumer::SocketConfig{std::move(pipe.fd)});
