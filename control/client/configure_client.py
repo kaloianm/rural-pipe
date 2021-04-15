@@ -28,8 +28,10 @@ if os.geteuid() != 0:
     exit("You need to have root privileges to run this script.\n"
          "Please try again, this time using 'sudo'. Exiting.")
 
+# List of interfaces that we will support
 WAN = 'eth0'
 WWAN = 'wwan0'
+USB_REMOVABLE = 'usb0'
 LAN = ['eth1', 'eth2']
 WLAN24GHZ = 'wlan0'
 TUNNEL = 'rpic'
@@ -133,6 +135,8 @@ iface lo inet loopback
 
 auto {WAN}
 iface {WAN} inet dhcp
+
+iface {USB_REMOVABLE} inet dhcp
 
 iface {WWAN} inet manual
   pre-up ifconfig {WWAN} down
