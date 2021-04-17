@@ -53,12 +53,22 @@ struct TestFifo {
           }()) {}
 };
 
-BOOST_AUTO_TEST_SUITE(TunnelFrameTests)
+struct TunnelFrameTestsFixture {
+    TunnelFrameTestsFixture() { memset(buffer, 0xAA, sizeof(buffer)); }
+    ~TunnelFrameTestsFixture() { CHECK(buffer[kTunnelFrameMaxSize] == 0xAA); }
 
-BOOST_AUTO_TEST_CASE(Tests) {
     uint8_t buffer[2 * kTunnelFrameMaxSize];
-    memset(buffer, 0xAA, sizeof(buffer));
+};
 
+BOOST_FIXTURE_TEST_SUITE(TunnelFrameTests, TunnelFrameTestsFixture)
+BOOST_AUTO_TEST_CASE(InvalidMagicNumber) {
+    strcpy((char *)buffer, "Long string which should not all be printed");
+    BOOST_CHECK_THROW(
+        TunnelFrameHeaderInfo::check(ConstTunnelFrameBuffer{buffer, kTunnelFrameMaxSize}),
+        Exception);
+}
+
+BOOST_AUTO_TEST_CASE(SmallSizeDatagramReadWrite) {
     {
         TLOG << "Small size datagram write";
         TunnelFrameWriter writer({buffer, kTunnelFrameMaxSize});
@@ -84,6 +94,9 @@ BOOST_AUTO_TEST_CASE(Tests) {
         TLOG << reader.size() << ": " << (char *)reader.data();
         CHECK(!reader.next());
     }
+}
+
+BOOST_AUTO_TEST_CASE(MaxSizeDatagram) {
     {
         TLOG << "Max size datagram write";
         TunnelFrameWriter writer({buffer, kTunnelFrameMaxSize});
@@ -108,6 +121,9 @@ BOOST_AUTO_TEST_CASE(Tests) {
         TLOG << reader.size();
         CHECK(!reader.next());
     }
+}
+
+BOOST_AUTO_TEST_CASE(EmptyDatagram) {
     {
         TLOG << "Empty datagram write";
         TunnelFrameWriter writer({buffer, kTunnelFrameMaxSize});
@@ -121,6 +137,9 @@ BOOST_AUTO_TEST_CASE(Tests) {
         CHECK(reader.header().seqNum == 2);
         CHECK(!reader.next());
     }
+}
+
+BOOST_AUTO_TEST_CASE(RandomWrites) {
     {
         TLOG << "Random writes";
         for (int i = 0; i < 5000; i++) {
@@ -134,11 +153,9 @@ BOOST_AUTO_TEST_CASE(Tests) {
         }
     }
 }
-
 BOOST_AUTO_TEST_SUITE_END()
 
-BOOST_AUTO_TEST_SUITE(TunnelFrameStreamTests)
-
+BOOST_FIXTURE_TEST_SUITE(TunnelFrameStreamTests, TunnelFrameTestsFixture)
 BOOST_AUTO_TEST_CASE(Tests) {
     int fd;
     TunnelFrameStream stream([&] {
@@ -191,11 +208,9 @@ BOOST_AUTO_TEST_CASE(Tests) {
         CHECK(!reader.next());
     }
 }
-
 BOOST_AUTO_TEST_SUITE_END()
 
-BOOST_AUTO_TEST_SUITE(TunnelProducerConsumerTests)
-
+BOOST_FIXTURE_TEST_SUITE(TunnelProducerConsumerTests, TunnelFrameTestsFixture)
 BOOST_AUTO_TEST_CASE(Tests) {
     TestFifo pipes[2];
     TunnelProducerConsumer tunnelPC(std::vector<FileDescriptor>{pipes[0].fd, pipes[1].fd}, 1500);
@@ -246,11 +261,9 @@ BOOST_AUTO_TEST_CASE(Tests) {
 
     testPipe.pipeInvokePrev({testPipe.lastFrameReceived, testPipe.lastFrameReceivedSize});
 }
-
 BOOST_AUTO_TEST_SUITE_END()
 
-BOOST_AUTO_TEST_SUITE(SocketProducerConsumerTests)
-
+BOOST_FIXTURE_TEST_SUITE(SocketProducerConsumerTests, TunnelFrameTestsFixture)
 BOOST_AUTO_TEST_CASE(Tests) {
     struct TestPipe : public TunnelFramePipe {
         TestPipe() : TunnelFramePipe("socketProducerConsumerTests") {}
@@ -264,7 +277,6 @@ BOOST_AUTO_TEST_CASE(Tests) {
     TestFifo pipe;
     socketPC.addSocket(SocketProducerConsumer::SocketConfig{std::move(pipe.fd)});
 }
-
 BOOST_AUTO_TEST_SUITE_END()
 
 } // namespace

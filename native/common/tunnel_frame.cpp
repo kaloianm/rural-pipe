@@ -41,7 +41,7 @@ const TunnelFrameHeaderInfo &TunnelFrameHeaderInfo::check(const ConstTunnelFrame
     const auto &hdrInfo = *((TunnelFrameHeaderInfo const *)buf.data);
     if (memcmp(hdrInfo.magic, TunnelFrameHeaderInfo::kMagic,
                sizeof(TunnelFrameHeaderInfo::kMagic) != 0))
-        throw Exception(boost::format("Unrecognised tunnel frame magic number %1%") %
+        throw Exception(boost::format("Unrecognised tunnel frame magic number %|.3s|") %
                         hdrInfo.magic);
     if (hdrInfo.desc.version != kVersion)
         throw Exception(boost::format("Unrecognised tunnel frame version %1%") %
