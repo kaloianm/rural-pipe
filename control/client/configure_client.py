@@ -184,7 +184,7 @@ ieee80211d=1
 country_code=ES
 wmm_enabled=1
 
-ssid=RuralPipe
+ssid=RuralPipe (Kitchen)
 # 1=wpa, 2=wep, 3=both
 auth_algs=1
 # WPA2 only
@@ -207,23 +207,21 @@ shell_command('netfilter-persistent save')
 
 # 7. Manual instructions for enabling USB Tethering with an Android Phone
 #
-# TODO: Automate these instructions
-#
 # Plug phone into the USB port of the Android device and select "Internet Connection Sharing"
 # instead of only charging, on the phone. This should show up the phone as a network
 # interface called usb0 when `sudo ifconfig -a` is run.
 #
-# Bring the device up by running `sudo ifconfig usb0 up` and have it acquire DHCP credentials and
-# set-up routing by running `sudo dhclient usb0`. After this, the phone should be set as a gateway
-# on the Raspberry Pi.
+# Bring the device up by running `sudo ifconfig usb0 up`.
 
 # 8. Manual instructions for using OpenVPN with NordVPN
 #
 # TODO: Automate these instructions
 #
-# Follow the manual (OpenVPN) instructions [here](https://support.nordvpn.com/Connectivity/Linux/1047409422/How-can-I-connect-to-NordVPN-using-Linux-Terminal.htm).
+# Follow the manual (OpenVPN) instructions at this link:
+#   https://support.nordvpn.com/Connectivity/Linux/1047409422/How-can-I-connect-to-NordVPN-using-Linux-Terminal.htm
 #
 # Create a file with the NordVPN credentials as `$HOME/.nordvpn_cred`: First line is the user name,
 # second line is the password.
 #
-# Connect using the following command line: `sudo openvpn --config /etc/openvpn/ovpn_udp/es63.nordvpn.com.udp.ovpn --auth-user-pass ~/.nordvpn_cred`.
+# Connect using the following command line:
+#   `sudo openvpn --config /etc/openvpn/ovpn_udp/es63.nordvpn.com.udp.ovpn --auth-user-pass ~/.nordvpn_cred`.
