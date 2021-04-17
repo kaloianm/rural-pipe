@@ -36,4 +36,4 @@ env.Append(LIBS=[
 sim7600 = env.Program(target='sim7600', source=[
     'main.cpp',
 ])
-env.Install(os.path.join(Dir('#').abspath, 'install/client'), [sim7600])
+env.Install(os.path.join(Dir('#').abspath, 'install/client/drivers'), [sim7600])
