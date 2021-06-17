@@ -34,7 +34,7 @@ USBWAN = 'usb0'
 MOBILEWAN = 'wwan0'
 LAN = ['eth1', 'eth2']
 WLAN24GHZ = 'wlan0'
-TUNNEL = 'rpic'
+TUNNEL = ['rpic', 'tun0']
 
 parser = argparse.ArgumentParser(description="""
 This script performs all the necessary configuration steps for a clean-installed Raspberry Pi 4
@@ -83,7 +83,7 @@ def set_config_option(file_name, option):
                 )
                 at_first_line = False
             if option_name in line:
-                line = f'{option_name}={option_value}'
+                line = f'{option_name}={option_value}\n'
                 option_set = True
             print(line, end='')
         if at_first_line:
@@ -137,23 +137,20 @@ iface lo inet loopback
 
 auto {WAN}
 iface {WAN} inet dhcp
-  metric 1
+  metric 10
 
 allow-hotplug {USBWAN}
 iface {USBWAN} inet dhcp
-  metric 2
+  metric 20
 
 manual {MOBILEWAN}
 iface {MOBILEWAN} inet manual
-  metric 3
+  metric 30
   pre-up ifconfig {MOBILEWAN} down
-  pre-up for _ in $(seq 1 10); do test -c /dev/cdc-wdm0 && break; /bin/sleep 1; done
-  pre-up qmicli -d /dev/cdc-wdm0 --dms-set-operating-mode='online'
   pre-up for _ in $(seq 1 10); do qmicli -d /dev/cdc-wdm0 --nas-get-home-network && break; /bin/sleep 1; done
   pre-up qmi-network-raw /dev/cdc-wdm0 start
   pre-up udhcpc -i {MOBILEWAN}
   post-down qmi-network-raw /dev/cdc-wdm0 stop
-  post-down qmicli -d /dev/cdc-wdm0 --dms-set-operating-mode='offline'
   post-down for _ in $(seq 1 10); do ! qmicli -d /dev/cdc-wdm0 --nas-get-home-network && break; /bin/sleep 1; done
 
 {''.join(map(lambda ifname: f'iface {ifname} inet manual' + chr(10), LAN + [WLAN24GHZ]))}
@@ -190,7 +187,7 @@ hw_mode=a
 ieee80211n=1
 channel=36
 ieee80211d=1
-country_code=ES
+country_code=FR
 wmm_enabled=1
 
 ssid=RuralPipe (Kitchen)
@@ -209,10 +206,8 @@ shell_command('sudo systemctl enable hostapd')
 
 # 6. Enable IP forwarding and NAT
 set_config_option('/etc/sysctl.conf', 'net.ipv4.ip_forward=1')
-shell_command(f'iptables -t nat -A POSTROUTING -o {WAN} -j MASQUERADE')
-shell_command(f'iptables -t nat -A POSTROUTING -o {USBWAN} -j MASQUERADE')
-shell_command(f'iptables -t nat -A POSTROUTING -o {MOBILEWAN} -j MASQUERADE')
-shell_command(f'iptables -t nat -A POSTROUTING -o {TUNNEL} -j MASQUERADE')
+for intf in [WAN, USBWAN, MOBILEWAN] + TUNNEL:
+    shell_command(f'iptables -t nat -A POSTROUTING -o {intf} -j MASQUERADE')
 shell_command('netfilter-persistent save')
 
 # 7. Manual instructions for enabling USB Tethering with an Android Phone
@@ -234,4 +229,4 @@ shell_command('netfilter-persistent save')
 # second line is the password.
 #
 # Connect using the following command line:
-#   `sudo openvpn --config /etc/openvpn/ovpn_udp/es63.nordvpn.com.udp.ovpn --auth-user-pass ~/.nordvpn_cred`.
+#   `sudo openvpn --config /etc/openvpn/ovpn_udp/es63.nordvpn.com.udp.ovpn --auth-user-pass $HOME/.nordvpn_cred`.
