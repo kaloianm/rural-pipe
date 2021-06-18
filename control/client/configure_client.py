@@ -122,7 +122,7 @@ shell_command(
     'echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections'
 )
 shell_command(
-    'apt install -y vim screen dnsmasq hostapd netfilter-persistent iptables-persistent bridge-utils openvpn libqmi-utils udhcpc'
+    'apt install -y vim screen dnsmasq hostapd netfilter-persistent iptables-persistent bridge-utils openvpn libqmi-utils udhcpc ifmetric'
 )
 
 # 2. Unblock the WLAN device(s) so they can transmit.
@@ -151,7 +151,6 @@ iface {MOBILEWAN} inet manual
   pre-up qmi-network-raw /dev/cdc-wdm0 start
   pre-up udhcpc -i {MOBILEWAN}
   post-down qmi-network-raw /dev/cdc-wdm0 stop
-  post-down for _ in $(seq 1 10); do ! qmicli -d /dev/cdc-wdm0 --nas-get-home-network && break; /bin/sleep 1; done
 
 {''.join(map(lambda ifname: f'iface {ifname} inet manual' + chr(10), LAN + [WLAN24GHZ]))}
 
@@ -168,7 +167,9 @@ iface br0 inet static
 rewrite_config_file(
     '/etc/dnsmasq.conf', f"""
 interface=br0
-dhcp-range=br0,192.168.4.50,192.168.4.200,255.255.255.0,12h
+dhcp-range=br0,192.168.4.10,192.168.4.200,255.255.255.0,12h
+dhcp-host=b0:4e:26:85:04:0c,192.168.4.10
+dhcp-host=c0:c9:e3:e2:c4:e1,192.168.4.11
 
 domain=rural
 
@@ -210,13 +211,15 @@ for intf in [WAN, USBWAN, MOBILEWAN] + TUNNEL:
     shell_command(f'iptables -t nat -A POSTROUTING -o {intf} -j MASQUERADE')
 shell_command('netfilter-persistent save')
 
-# 7. Manual instructions for enabling USB Tethering with an Android Phone
+# 7. Manual instructions for starting the wwan0 interface
 #
-# Plug phone into the USB port of the Android device and select "Internet Connection Sharing"
-# instead of only charging, on the phone. This should show up the phone as a network
-# interface called usb0 when `sudo ifconfig -a` is run.
+# TODO: Automate these instructions
 #
-# Bring the device up by running `sudo ifconfig usb0 up`.
+# Enable the GSM radio by running this command:
+#   `sudo qmicli -d /dev/cdc-wdm0 --dms-set-operating-mode='online'`
+#
+# In case the interface gets stuck, reset it using and then bring it back online:
+#   `sudo qmicli -d /dev/cdc-wdm0 --dms-set-operating-mode='reset'`
 
 # 8. Manual instructions for using OpenVPN with NordVPN
 #
