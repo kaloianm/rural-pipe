@@ -30,8 +30,8 @@ if os.geteuid() != 0:
 
 # List of interfaces that we will support
 WAN = 'eth0'
-USBWAN = 'usb0'
 MOBILEWAN = 'wwan0'
+USBWAN = 'usb0'
 LAN = ['eth1', 'eth2']
 WLAN24GHZ = 'wlan0'
 TUNNEL = ['rpic', 'tun0']
@@ -73,24 +73,56 @@ def rewrite_config_file(file_name, contents):
 # file file_name or adds it if it doesn't exist.
 def set_config_option(file_name, option):
     (option_name, option_value) = option.split('=')
+
     at_first_line = True
     option_set = False
+
     with fileinput.input(file_name, inplace=True) as file_name_input:
-        for line in file_name_input:
-            if at_first_line:
+        for input_line in file_name_input:
+            if at_first_line and (not 'configure_client.py' in input_line):
                 print(
                     f"# THIS FILE {file_name} WAS MODIFIED BY RuralPupe's configure_client.py SCRIPT"
                 )
-                at_first_line = False
-            if option_name in line:
-                line = f'{option_name}={option_value}\n'
+            at_first_line = False
+            if option_name in input_line:
+                input_line = f'{option_name}={option_value}\n'
                 option_set = True
-            print(line, end='')
-        if at_first_line:
-            print(f"# THIS FILE {file_name} WAS MODIFIED BY RuralPupe's configure_client.py SCRIPT")
-        if not option_set:
-            with open(file_name, 'a') as file_name_input:
+            print(input_line, end='')
+
+    if at_first_line or not option_set:
+        with open(file_name, 'a') as file_name_input:
+            if at_first_line:
+                file_name_input.write(
+                    f"# THIS FILE {file_name} WAS MODIFIED BY RuralPupe's configure_client.py SCRIPT"
+                )
+            if not option_set:
                 file_name_input.write(f'{option_name}={option_value}')
+
+
+# If `line` doesn't exist in `file_name`, adds it at the end, otherwise does nothing.
+def append_config_line(file_name, line):
+    at_first_line = True
+    line_set = False
+
+    with fileinput.input(file_name, inplace=True) as file_name_input:
+        for input_line in file_name_input:
+            if at_first_line and (not 'configure_client.py' in input_line):
+                print(
+                    f"# THIS FILE {file_name} WAS MODIFIED BY RuralPupe's configure_client.py SCRIPT"
+                )
+            at_first_line = False
+            if line == input_line:
+                line_set = True
+            print(input_line, end='')
+
+    if at_first_line or not line_set:
+        with open(file_name, 'a') as file_name_input:
+            if at_first_line:
+                file_name_input.write(
+                    f"# THIS FILE {file_name} WAS MODIFIED BY RuralPupe's configure_client.py SCRIPT"
+                )
+            if not line_set:
+                file_name_input.write(line)
 
 
 # 0. Recommended first (manual) step after installing Raspbian is to run sudo apt update in order
@@ -108,8 +140,14 @@ def check_network_interfaces():
     if not lines[0].startswith('Iface'):
         raise Exception('Unexpected output: ', lines[0])
     interfaces = list(map(lambda itf: itf.split()[0], lines[1:]))
-    if not set([WAN, MOBILEWAN] + LAN + [WLAN24GHZ]).issubset(set(interfaces)):
-        raise Exception('Unable to find required interfaces')
+    if not set([WAN]).issubset(set(interfaces)):
+        raise Exception('Unable to find the required WAN interfaces')
+    if not set([MOBILEWAN]).issubset(set(interfaces)):
+        print('WARNING: No WWAN interfaces found')
+    if not set([WLAN24GHZ]).issubset(set(interfaces)):
+        raise Exception('Unable to find the required LAN interfaces')
+    if not set(LAN).issubset(set(interfaces)):
+        print('WARNING: No LAN interfaces found')
 
 
 check_network_interfaces()
@@ -122,7 +160,7 @@ shell_command(
     'echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections'
 )
 shell_command(
-    'apt install -y vim screen dnsmasq hostapd netfilter-persistent iptables-persistent bridge-utils openvpn libqmi-utils udhcpc ifmetric'
+    'apt install -y vim screen dnsmasq hostapd netfilter-persistent iptables-persistent bridge-utils openvpn libqmi-utils udhcpc ifmetric snapd'
 )
 
 # 2. Unblock the WLAN device(s) so they can transmit.
@@ -147,10 +185,10 @@ manual {MOBILEWAN}
 iface {MOBILEWAN} inet manual
   metric 30
   pre-up ifconfig {MOBILEWAN} down
-  pre-up for _ in $(seq 1 10); do qmicli -d /dev/cdc-wdm0 --nas-get-home-network && break; /bin/sleep 1; done
-  pre-up qmi-network-raw /dev/cdc-wdm0 start
+  pre-up /snap/bin/mmcli -m 0 --enable
+  pre-up /snap/bin/mmcli -m 0 -b 0 --connect
   pre-up udhcpc -i {MOBILEWAN}
-  post-down qmi-network-raw /dev/cdc-wdm0 stop
+  post-down /snap/bin/mmcli -m 0 -b 0 --disconnect
 
 {''.join(map(lambda ifname: f'iface {ifname} inet manual' + chr(10), LAN + [WLAN24GHZ]))}
 
@@ -205,11 +243,14 @@ set_config_option('/etc/default/hostapd', 'DAEMON_CONF="/etc/hostapd/hostapd.con
 shell_command('sudo systemctl unmask hostapd')
 shell_command('sudo systemctl enable hostapd')
 
-# 6. Enable IP forwarding and NAT
+# 6. Enable IP forwarding, NAT and the special routing rule for the rpi interface
 set_config_option('/etc/sysctl.conf', 'net.ipv4.ip_forward=1')
+
 for intf in [WAN, USBWAN, MOBILEWAN] + TUNNEL:
     shell_command(f'iptables -t nat -A POSTROUTING -o {intf} -j MASQUERADE')
 shell_command('netfilter-persistent save')
+
+append_config_line('/etc/iproute2/rt_tables', '1    rpi')
 
 # 7. Manual instructions for starting the wwan0 interface
 #

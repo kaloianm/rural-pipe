@@ -42,7 +42,7 @@ class ClientService(Service):
 
     async def post_configure(self):
         ipcmd = await asyncio.create_subprocess_shell(
-            f'ip route add default via {str(self.ip_iface.ip)} dev rpic metric 0')
+            f'ip route add default via {str(self.ip_iface.ip)} dev rpic table rpi')
         await ipcmd.wait()
 
 
