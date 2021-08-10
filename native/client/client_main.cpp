@@ -45,7 +45,8 @@ public:
               struct sockaddr_in serverAddr;
               asio::io_service io_service;
               asio::ip::tcp::resolver resolver(io_service);
-              asio::ip::tcp::resolver::query query(ctx.serverHost, std::to_string(ctx.serverPort));
+              asio::ip::tcp::resolver::query query(asio::ip::tcp::v4(), ctx.serverHost,
+                                                   std::to_string(ctx.serverPort));
               asio::ip::tcp::resolver::iterator iter = resolver.resolve(query);
               memcpy(&serverAddr, iter->endpoint().data(), iter->endpoint().size());
 
