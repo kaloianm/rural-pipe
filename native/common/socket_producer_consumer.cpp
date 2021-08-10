@@ -108,6 +108,24 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
     if (!isSocket)
         BOOST_LOG_TRIVIAL(warning)
             << "File descriptor " << config.fd.toString() << " is not a socket";
+    else {
+        int recvBufSize;
+        {
+            int recvBufSizeLen = sizeof(recvBufSize);
+            SYSCALL(::getsockopt(config.fd, SOL_SOCKET, SO_RCVBUF, (void *)&recvBufSize,
+                                 (socklen_t *)&recvBufSizeLen));
+        }
+
+        int sendBufSize;
+        {
+            int sendBufSizeLen = sizeof(sendBufSize);
+            SYSCALL(::getsockopt(config.fd, SOL_SOCKET, SO_SNDBUF, (void *)&sendBufSize,
+                                 (socklen_t *)&sendBufSizeLen));
+        }
+
+        BOOST_LOG_TRIVIAL(info) << config.fd.toString() << " socket buffer sizes: RCV "
+                                << recvBufSize << " SND " << sendBufSize;
+    }
 
     BOOST_LOG_TRIVIAL(info) << "Starting thread for socket file descriptor "
                             << config.fd.toString();
