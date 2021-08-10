@@ -205,22 +205,7 @@ void SocketProducerConsumer::_receiveFromSocketLoop(Session &session, TunnelFram
             throw Exception("Interrupted");
         }
 
-        auto buf = stream.receive();
-
-        while (true) {
-            if (_interrupted.load()) {
-                throw Exception("Interrupted");
-            }
-
-            try {
-                pipeInvokePrev(buf);
-                break;
-            } catch (const NotYetReadyException &ex) {
-                BOOST_LOG_TRIVIAL(debug)
-                    << "Tunnel not yet ready: " << ex.what() << "; retrying ...";
-                ::sleep(5);
-            }
-        }
+        pipeInvokePrev(stream.receive());
     }
 }
 

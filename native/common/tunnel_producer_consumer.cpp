@@ -34,7 +34,7 @@ namespace {
 using Milliseconds = std::chrono::milliseconds;
 
 const std::chrono::seconds kWaitForData(5);
-const std::chrono::milliseconds kWaitForBatch(5);
+const std::chrono::milliseconds kWaitForFullerBatch(5);
 
 std::string debugLogDatagram(uint8_t const *data, size_t size) {
     std::stringstream ss;
@@ -144,7 +144,7 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
                     << "Waiting for datagrams from file descriptor " << tunnelFd << " ("
                     << numDatagramsWritten << " datagrams received so far)";
 
-                res = tunnelFd.poll(numDatagramsWritten ? Milliseconds(kWaitForBatch)
+                res = tunnelFd.poll(numDatagramsWritten ? Milliseconds(kWaitForFullerBatch)
                                                         : Milliseconds(kWaitForData));
                 if (res > 0)
                     break;
@@ -193,7 +193,7 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
                 pipeInvokeNext(writer.buffer());
                 break;
             } catch (const NotYetReadyException &ex) {
-                BOOST_LOG_TRIVIAL(debug)
+                BOOST_LOG_TRIVIAL(trace)
                     << "Socket not yet ready: " << ex.what() << "; retrying ...";
                 ::sleep(5);
             }

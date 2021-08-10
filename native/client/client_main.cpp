@@ -73,7 +73,7 @@ public:
                 _ctx.waitForExit();
                 break;
             } catch (const ConnRefusedSystemException &ex) {
-                BOOST_LOG_TRIVIAL(debug)
+                BOOST_LOG_TRIVIAL(trace)
                     << "Server not yet ready due to error: " << ex.what() << "; retrying ...";
                 ::sleep(5);
             } catch (const Exception &ex) {
