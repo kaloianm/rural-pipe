@@ -107,8 +107,7 @@ void TunnelProducerConsumer::onTunnelFrameFromNext(TunnelFrameBuffer buf) {
     while (reader.next()) {
         // Ensure that the same source/destination address pair always uses the same tunnel device
         // queue
-        const auto &ip = IP::read(reader.data());
-        int idxTunnelFds = (ip.saddr + ip.daddr) % _tunnelFds.size();
+        int idxTunnelFds = ++_tunnelFdRoundRobin % _tunnelFds.size();
         auto &tunnelFd = _tunnelFds[idxTunnelFds];
         int numWritten = tunnelFd.write(reader.data(), reader.size());
         _stats.bytesOut[idxTunnelFds] += numWritten;

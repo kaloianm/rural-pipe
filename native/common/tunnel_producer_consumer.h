@@ -54,6 +54,9 @@ private:
     std::vector<FileDescriptor> _tunnelFds;
     int _mtu;
 
+    // Used to select the output queue on which to send a datagram in a round-robin fashion
+    std::atomic_uint64_t _tunnelFdRoundRobin{0};
+
     // Self-synchronising set of statistics for the tunnel interface
     struct Stats {
         Stats(int nTunnelFds) : bytesIn(nTunnelFds), bytesOut(nTunnelFds) {}
