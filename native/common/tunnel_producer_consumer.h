@@ -47,18 +47,29 @@ private:
      * `_tunnelFds`). They receive incoming datagrams, pack them into TunneFrame(s) and pass them
      * downwstream to the pipe attached to via 'TunnelFramePipe::pipeTo'.
      */
-    void _receiveFromTunnelLoop(FileDescriptor &tunnelFd);
+    void _receiveFromTunnelLoop(int idxTunnelFds);
 
     // Set of file descriptor provided a construction time, corresponding to the queues of the
     // tunnel device
     std::vector<FileDescriptor> _tunnelFds;
     int _mtu;
 
+    // Self-synchronising set of statistics for the tunnel interface
+    struct Stats {
+        Stats(int nTunnelFds) : bytesIn(nTunnelFds), bytesOut(nTunnelFds) {}
+
+        // Global statistics
+
+        // Per-tunnel queue statistics
+        std::vector<std::atomic_uint64_t> bytesIn;
+        std::vector<std::atomic_uint64_t> bytesOut;
+    } _stats;
+
     // Set of threads draining the file descriptors from `_tunnelFds`
     boost::asio::thread_pool _pool;
 
     // Serves as a source for sequencing the tunnel frames
-    std::atomic<uint64_t> _seqNum{0};
+    std::atomic_uint64_t _seqNum{0};
 
     // Mutex to protect access to the state below
     std::mutex _mutex;

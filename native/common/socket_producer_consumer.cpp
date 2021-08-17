@@ -190,7 +190,7 @@ void SocketProducerConsumer::onTunnelFrameFromPrev(TunnelFrameBuffer buf) {
     if (_sessions.empty())
         throw NotYetReadyException("The other side of the tunnel is not connected yet");
 
-    // TODO: Choose a client/server connection to send it on based on some bandwidth requirements
+    // TODO: Choose a client/server connection to send it on, based on some bandwidth requirements
     // metric, etc.
     _sessions.begin()->second.streams.front().send(buf);
 }

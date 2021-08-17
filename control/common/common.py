@@ -69,7 +69,7 @@ class Service:
     # Starts the service executable asynchronously and returns a future, which will be signaled when
     # the service process has completed
     async def start_service_and_wait(self):
-        print('Pre-configuring service')
+        print('Pre-configuring service ...')
         try:
             await self.pre_configure()
         except Exception as e:
@@ -91,8 +91,9 @@ class Service:
             await self.service_process.wait()
             raise
 
-        print('Service started and active, configuring ...')
+        print('Service started and active, configuring the network interface ...')
 
+        # Configure the tunnel interface by assigning IP address and bringing it up
         ipcmd = await asyncio.create_subprocess_shell(
             f'ip link set {self.options.tunnel_interface} up')
         await ipcmd.wait()
@@ -101,9 +102,14 @@ class Service:
             f'ip addr add {str(self.ip_iface)} dev {self.options.tunnel_interface}')
         await ipcmd.wait()
 
+        # Custom per-service configuration
         await self.post_configure()
 
+        print('Service configured')
+
         await asyncio.gather(self.service_process.wait())
+
+        print('Service stopping ...')
 
     # Gives opportunity to the various service implementations to append their own custom options
     # to the parser arguments. This method must not throw.

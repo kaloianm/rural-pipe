@@ -64,17 +64,19 @@ std::string debugLogDatagram(uint8_t const *data, size_t size) {
 } // namespace
 
 TunnelProducerConsumer::TunnelProducerConsumer(std::vector<FileDescriptor> tunnelFds, int mtu)
-    : TunnelFramePipe("Tunnel"), _tunnelFds(std::move(tunnelFds)), _mtu(mtu) {
-    for (auto &fd : _tunnelFds) {
-        BOOST_LOG_TRIVIAL(info) << "Starting thread for tunnel file descriptor " << fd;
+    : TunnelFramePipe("Tunnel"), _tunnelFds(std::move(tunnelFds)), _mtu(mtu),
+      _stats(_tunnelFds.size()) {
+    for (int i = 0; i < _tunnelFds.size(); i++) {
+        BOOST_LOG_TRIVIAL(info) << "Starting thread for tunnel file descriptor " << _tunnelFds[i];
 
         std::lock_guard<std::mutex> lg(_mutex);
 
-        boost::asio::post(_pool, [this, &fd] {
+        boost::asio::post(_pool, [this, i] {
+            auto &fd = _tunnelFds[i];
             BOOST_LOG_NAMED_SCOPE("_receiveFromTunnelLoop");
 
             try {
-                _receiveFromTunnelLoop(fd);
+                _receiveFromTunnelLoop(i);
 
                 RASSERT_MSG(false, boost::format("Thread for tunnel device %s exited normally. "
                                                  "This should never be reached.") %
@@ -106,15 +108,19 @@ void TunnelProducerConsumer::onTunnelFrameFromNext(TunnelFrameBuffer buf) {
         // Ensure that the same source/destination address pair always uses the same tunnel device
         // queue
         const auto &ip = IP::read(reader.data());
-        auto &tunnelFd = _tunnelFds[(ip.saddr + ip.daddr) % _tunnelFds.size()];
+        int idxTunnelFds = (ip.saddr + ip.daddr) % _tunnelFds.size();
+        auto &tunnelFd = _tunnelFds[idxTunnelFds];
         int numWritten = tunnelFd.write(reader.data(), reader.size());
+        _stats.bytesOut[idxTunnelFds] += numWritten;
         BOOST_LOG_TRIVIAL(trace) << "Wrote " << numWritten << " byte datagram to tunnel socket "
                                  << tunnelFd << ": "
                                  << debugLogDatagram(reader.data(), reader.size());
     }
 }
 
-void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
+void TunnelProducerConsumer::_receiveFromTunnelLoop(int idxTunnelFds) {
+    FileDescriptor &tunnelFd = _tunnelFds[idxTunnelFds];
+
     uint8_t buffer[kTunnelFrameMaxSize];
     uint8_t *mtuBuffer = (uint8_t *)alloca(_mtu);
     int mtuBufferSize = 0;
@@ -172,6 +178,7 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(FileDescriptor &tunnelFd) {
             }
 
             memcpy(writer.data(), mtuBuffer, mtuBufferSize);
+            _stats.bytesIn[idxTunnelFds] += mtuBufferSize;
             BOOST_LOG_TRIVIAL(trace)
                 << "Received " << mtuBufferSize << " byte datagram from tunnel socket " << tunnelFd
                 << ": " << debugLogDatagram(writer.data(), mtuBufferSize);
