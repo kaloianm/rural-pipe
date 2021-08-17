@@ -130,7 +130,7 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
     BOOST_LOG_TRIVIAL(info) << "Starting thread for socket file descriptor "
                             << config.fd.toString();
 
-    boost::asio::post([this, config = std::move(config)]() mutable {
+    boost::asio::post(_pool, [this, config = std::move(config)]() mutable {
         BOOST_LOG_NAMED_SCOPE("_receiveFromSocketLoop");
 
         TunnelFrameStream s(std::move(config.fd));
