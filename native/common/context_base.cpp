@@ -95,7 +95,7 @@ ContextBase::ShouldStart ContextBase::start(int argc, const char *argv[],
 
     // Instantiate the commands server so that the controlling script can start polling for startup
     // state information
-    _cmdServer.emplace(_serviceName, std::move(onCommand));
+    _cmdServer.emplace(_ioService, _serviceName, std::move(onCommand));
 
     return kYes;
 }

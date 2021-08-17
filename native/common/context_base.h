@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <boost/asio.hpp>
 #include <boost/optional.hpp>
 #include <boost/program_options.hpp>
 #include <condition_variable>
@@ -72,6 +73,9 @@ public:
 protected:
     boost::program_options::options_description _desc;
     boost::program_options::variables_map _vm;
+
+    // Boost ASIO context
+    boost::asio::io_service _ioService;
 
 private:
     const std::string _serviceName;

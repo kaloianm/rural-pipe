@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <boost/asio.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include <functional>
 #include <string>
@@ -34,16 +36,18 @@ namespace ruralpi {
 class CommandsServer {
 public:
     // First argument is the command, the rest are its arguments
-    using OnCommandFn = std::function<std::string(int, const char *[])>;
+    using OnCommandFn = std::function<std::string(std::vector<std::string>)>;
 
-    CommandsServer(std::string pipeName, OnCommandFn onCommand);
+    CommandsServer(boost::asio::io_service &ioService, std::string pipeName, OnCommandFn onCommand);
     ~CommandsServer();
 
 private:
+    void _commandLoop();
+
     std::string _pipeName;
     OnCommandFn _onCommand;
 
-    ScopedFileDescriptor _fd;
+    boost::filesystem::fstream _fstream;
     std::thread _thread;
 };
 

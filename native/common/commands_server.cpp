@@ -20,24 +20,36 @@
 
 #include "common/commands_server.h"
 
-#include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include <boost/log/trivial.hpp>
 
 namespace ruralpi {
-namespace {
 
 namespace fs = boost::filesystem;
 
-ScopedFileDescriptor openPipe(const std::string &pipeName) {
-    auto fifoPath = fs::temp_directory_path() / pipeName;
-    return ScopedFileDescriptor(fifoPath.string(), open(fifoPath.c_str(), O_RDWR));
+namespace {} // namespace
+
+CommandsServer::CommandsServer(boost::asio::io_service &ioService, std::string pipeName,
+                               OnCommandFn onCommand)
+    : _pipeName(std::move(pipeName)), _onCommand(std::move(onCommand)),
+      _fstream((fs::temp_directory_path() / _pipeName)), _thread([this] { _commandLoop(); }) {
+    boost::asio::local::stream_protocol::endpoint ep("/tmp/foobar");
 }
 
-} // namespace
-
-CommandsServer::CommandsServer(std::string pipeName, OnCommandFn onCommand)
-    : _pipeName(std::move(pipeName)), _onCommand(std::move(onCommand)), _fd(openPipe(_pipeName)) {}
-
 CommandsServer::~CommandsServer() {}
+
+void CommandsServer::_commandLoop() {
+    std::string command;
+    while (_fstream >> command) {
+        BOOST_LOG_TRIVIAL(debug) << "Received command: " << command;
+
+        [&]() noexcept {
+            std::vector<std::string> tokens;
+            _onCommand(boost::algorithm::split(tokens, command, boost::is_any_of("\t "),
+                                               boost::token_compress_on));
+        }();
+    }
+}
 
 } // namespace ruralpi

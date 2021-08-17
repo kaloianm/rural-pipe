@@ -34,7 +34,7 @@ struct Context : public ContextBase {
     std::vector<std::string> interfaces;
 
 private:
-    std::string _onCommand(int argc, const char *argv[]);
+    std::string _onCommand(const std::vector<std::string> &args);
 };
 
 } // namespace client

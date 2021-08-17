@@ -41,8 +41,8 @@ Context::Context() : ContextBase("client") {
 Context::~Context() = default;
 
 Context::ShouldStart Context::start(int argc, const char *argv[]) {
-    ShouldStart shouldStart = ContextBase::start(
-        argc, argv, [this](int argc, const char *argv[]) { return _onCommand(argc, argv); });
+    ShouldStart shouldStart =
+        ContextBase::start(argc, argv, [this](auto args) { return _onCommand(args); });
     if (shouldStart == kYes) {
         serverHost = _vm["settings.server_host"].as<std::string>();
         serverPort = _vm["settings.server_port"].as<int>();
@@ -52,7 +52,7 @@ Context::ShouldStart Context::start(int argc, const char *argv[]) {
     return shouldStart;
 }
 
-std::string Context::_onCommand(int argc, const char *argv[]) { return ""; }
+std::string Context::_onCommand(const std::vector<std::string> &args) { return "NOT IMPLEMENTED"; }
 
 } // namespace client
 } // namespace ruralpi
