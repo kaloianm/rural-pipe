@@ -24,32 +24,54 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/log/trivial.hpp>
 
+#include "common/exception.h"
+
 namespace ruralpi {
 
+namespace asio = boost::asio;
 namespace fs = boost::filesystem;
 
-namespace {} // namespace
+namespace {
 
-CommandsServer::CommandsServer(boost::asio::io_service &ioService, std::string pipeName,
+auto makeAcceptor(asio::io_service &ioService, const std::string &socketName) {
+    std::string socketPath((fs::temp_directory_path() / socketName).string());
+    BOOST_LOG_TRIVIAL(debug) << "Constructing command server acceptor: " << socketPath;
+
+    try {
+        SYSCALL(::unlink(socketPath.c_str()));
+    } catch (const FileNotFoundSystemException &ex) {
+        // Ignore if the socket path doesn't exist
+    }
+
+    auto acceptor = asio::local::stream_protocol::acceptor(
+        ioService, asio::local::stream_protocol::endpoint(socketPath));
+
+    return acceptor;
+}
+
+} // namespace
+
+CommandsServer::CommandsServer(asio::io_service &ioService, std::string pipeName,
                                OnCommandFn onCommand)
-    : _pipeName(std::move(pipeName)), _onCommand(std::move(onCommand)),
-      _fstream((fs::temp_directory_path() / _pipeName)), _thread([this] { _commandLoop(); }) {
-    boost::asio::local::stream_protocol::endpoint ep("/tmp/foobar");
+    : _pipeName(std::move(pipeName)), _onCommand(std::move(onCommand)), _ioService(ioService),
+      _acceptor(makeAcceptor(_ioService, _pipeName)) {
+    _acceptNext();
 }
 
 CommandsServer::~CommandsServer() {}
 
-void CommandsServer::_commandLoop() {
-    std::string command;
-    while (_fstream >> command) {
-        BOOST_LOG_TRIVIAL(debug) << "Received command: " << command;
+void CommandsServer::_acceptNext() {
+    auto conn = std::make_shared<UNIXConnection>(_ioService);
 
-        [&]() noexcept {
-            std::vector<std::string> tokens;
-            _onCommand(boost::algorithm::split(tokens, command, boost::is_any_of("\t "),
-                                               boost::token_compress_on));
-        }();
-    }
+    _acceptor.async_accept(conn->socket(), [this, conn](const boost::system::error_code &error) {
+        BOOST_LOG_TRIVIAL(debug) << "Accepted connection: " << error;
+
+        if (!error) {
+            conn->start();
+        }
+
+        _acceptNext();
+    });
 }
 
 } // namespace ruralpi

@@ -58,6 +58,11 @@ public:
     static std::string getLastError();
 };
 
+class FileNotFoundSystemException : public SystemException {
+public:
+    using SystemException::SystemException;
+};
+
 class ConnRefusedSystemException : public SystemException {
 public:
     using SystemException::SystemException;

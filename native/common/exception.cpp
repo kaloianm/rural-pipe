@@ -47,6 +47,8 @@ void SystemException::throwFromErrno(const std::string &context) {
                    : (boost::format("(%s): System error %s") % context % errnoMsg(savedErrno));
 
     switch (savedErrno) {
+    case ENOENT:
+        throw FileNotFoundSystemException(std::move(msg));
     case ECONNREFUSED:
         throw ConnRefusedSystemException(std::move(msg));
     default:

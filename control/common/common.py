@@ -31,7 +31,7 @@ from optparse import OptionParser
 class Service:
     def __init__(self, name):
         self.name = name
-        self.fifo_path = os.path.join('/tmp', name)
+        self.unix_socket_path = os.path.join('/tmp', name)
 
         print(f'Starting service {self.name}')
 
@@ -59,11 +59,7 @@ class Service:
         self.ip_network = ipaddress.ip_network(self.ip_iface.network)
         print('Network:', str(self.ip_network.network_address))
 
-        # From this point onward, the service is starting
-        if not os.path.exists(self.fifo_path):
-            os.mkfifo(self.fifo_path, mode=0o666)
-
-        # Asynchronous from here onwards
+        # From this point onward, the service is starting and all operations become asynchronous
         asyncio.run(self.start_service_and_wait())
 
     # Starts the service executable asynchronously and returns a future, which will be signaled when

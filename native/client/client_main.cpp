@@ -117,7 +117,6 @@ private:
 };
 
 void clientMain(Context &ctx) {
-    BOOST_LOG_NAMED_SCOPE("clientMain");
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe client starting with server " << ctx.serverHost << ':'
                             << ctx.serverPort << " and tunnel interface " << ctx.tunnel_interface
                             << " listening on " << ctx.nqueues << " queues";
@@ -139,6 +138,8 @@ void clientMain(Context &ctx) {
 } // namespace ruralpi
 
 int main(int argc, const char *argv[]) {
+    BOOST_LOG_NAMED_SCOPE("clientMain");
+
     try {
         ruralpi::client::Context ctx;
         if (ctx.start(argc, argv) == ruralpi::client::Context::kYes)
@@ -146,7 +147,7 @@ int main(int argc, const char *argv[]) {
 
         return ctx.waitForExit();
     } catch (const std::exception &ex) {
-        BOOST_LOG_TRIVIAL(fatal) << "Error occurred: " << ex.what();
+        BOOST_LOG_TRIVIAL(fatal) << "Error occurred at client startup: " << ex.what();
         return 1;
     }
 }

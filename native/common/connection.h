@@ -1,5 +1,5 @@
 /**
- * Copyright 2020 Kaloian Manassiev
+ * Copyright 2021 Kaloian Manassiev
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  * associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -18,38 +18,37 @@
 
 #pragma once
 
-#include <boost/filesystem.hpp>
-#include <boost/program_options.hpp>
-#include <functional>
-#include <string>
-#include <thread>
-
-#include "common/connection.h"
-#include "common/file_descriptor.h"
+#include <boost/asio.hpp>
 
 namespace ruralpi {
 
 /**
- * Single server, which accepts simple text commands (ending in new line) and invokes the
- * `onCommand` handler with the tokenised result.
+ * Contains the base functionality for the two types of connections supported.
  */
-class CommandsServer {
+class ConnectionBase {
 public:
-    // First argument is the command, the rest are its arguments
-    using OnCommandFn = std::function<std::string(std::vector<std::string>)>;
+    void start();
 
-    CommandsServer(boost::asio::io_service &ioService, std::string pipeName, OnCommandFn onCommand);
-    ~CommandsServer();
-
-private:
-    void _acceptNext();
-
-    std::string _pipeName;
-    OnCommandFn _onCommand;
+protected:
+    ConnectionBase(boost::asio::io_service &ioService);
+    virtual ~ConnectionBase();
 
     boost::asio::io_service &_ioService;
-
-    boost::asio::local::stream_protocol::acceptor _acceptor;
 };
+
+template <typename TSocket>
+class Connection : public ConnectionBase {
+public:
+    Connection(boost::asio::io_service &ioService)
+        : ConnectionBase(ioService), _socket(_ioService) {}
+
+    TSocket &socket() { return _socket; }
+
+private:
+    TSocket _socket;
+};
+
+using UNIXConnection = Connection<boost::asio::local::stream_protocol::socket>;
+using TCPConnection = Connection<boost::asio::ip::tcp::socket>;
 
 } // namespace ruralpi

@@ -86,7 +86,6 @@ private:
 };
 
 void serverMain(Context &ctx) {
-    BOOST_LOG_NAMED_SCOPE("serverMain");
     BOOST_LOG_TRIVIAL(info) << "Rural Pipe server starting on port " << ctx.port
                             << " tunnel interface " << ctx.tunnel_interface << " listening on "
                             << ctx.nqueues << " queues";
@@ -108,6 +107,8 @@ void serverMain(Context &ctx) {
 } // namespace ruralpi
 
 int main(int argc, const char *argv[]) {
+    BOOST_LOG_NAMED_SCOPE("serverMain");
+
     try {
         ruralpi::server::Context ctx;
         if (ctx.start(argc, argv) == ruralpi::server::Context::kYes)
@@ -115,7 +116,7 @@ int main(int argc, const char *argv[]) {
 
         return ctx.waitForExit();
     } catch (const std::exception &ex) {
-        BOOST_LOG_TRIVIAL(fatal) << "Error occurred: " << ex.what();
+        BOOST_LOG_TRIVIAL(fatal) << "Error occurred at server startup: " << ex.what();
         return 1;
     }
 }

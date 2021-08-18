@@ -21,8 +21,9 @@ common = env.Library(
     target='common',
     source=[
         'base.cpp',
-        'compressing_tunnel_frame_pipe.cpp',
         'commands_server.cpp',
+        'compressing_tunnel_frame_pipe.cpp',
+        'connection.cpp',
         'context_base.cpp',
         'exception.cpp',
         'file_descriptor.cpp',
