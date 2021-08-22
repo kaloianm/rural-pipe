@@ -19,8 +19,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import asyncio
+import netifaces
 import os
-import subprocess
 import sys
 
 from common import Service
@@ -35,18 +35,20 @@ class ServerService(Service):
         super().__init__('server')
 
     def add_service_options(self, parser, config):
-        parser.add_option('--wan_interface', dest='wan_interface',
-                          help='Interface on which all traffic to the internet must go',
-                          default=config.get('settings', 'wan_interface'))
+        pass
 
     async def pre_configure(self):
+        gws = netifaces.gateways()
+        default_gateway = gws['default'][netifaces.AF_INET]
+
         # Check if NAT is enabled for the server's WAN interface so that packets can flow
         ipcmd = await asyncio.create_subprocess_shell(
-            f'iptables -C POSTROUTING -t nat -o {self.options.wan_interface} -j MASQUERADE')
+            f'iptables -C POSTROUTING -t nat -o {default_gateway[1]} -j MASQUERADE')
         if await ipcmd.wait() > 0:
-            raise Exception(f"""NAT is not configured. Please run the following command:
-                                sudo iptables -A POSTROUTING -t nat -o {self.options.wan_interface} -j MASQUERADE"""
-                            )
+            raise Exception(
+                f"""NAT is not configured on the default gateway. Please run the following command:
+                            sudo iptables -A POSTROUTING -t nat -o {default_gateway[1]} -j MASQUERADE"""
+            )
 
     async def post_configure(self):
         pass
