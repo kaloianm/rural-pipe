@@ -6,7 +6,6 @@
                 "/usr/include",
                 "/usr/local/include",
                 "${workspaceFolder}/native",
-                "${workspaceFolder}/native/drivers/bcm2835/include",
                 "${workspaceFolder}/build/native/pc/boost/include"
             ],
             "defines": [],
@@ -16,7 +15,6 @@
                     "/usr/include",
                     "/usr/local/include",
                     "${workspaceFolder}/native",
-                    "${workspaceFolder}/native/drivers/bcm2835/include",
                     "${workspaceFolder}/build/native/pc/boost/include"
                 ],
                 "limitSymbolsToIncludedHeaders": true,
