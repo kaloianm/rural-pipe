@@ -27,10 +27,9 @@
             "name": "Attach to gdbserver on Parallels",
             "type": "gdb",
             "request": "attach",
-            "executable": "${workspaceFolder}/install/server/server",
             "target": "ubuntu-20.04.shared:20000",
             "remote": true,
-            "cwd": "${workspaceFolder}/install/server",
+            "cwd": "${workspaceFolder}",
         }
     ]
 }

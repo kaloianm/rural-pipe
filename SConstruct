@@ -38,7 +38,7 @@ AddOption('--client_arch', default='pc', dest='client_arch', type='choice',
 AddOption('--server_arch', default='pc', dest='server_arch', type='choice',
           choices=list(supported_architectures.keys()),
           help='Use SERVER_ARCH as the architecture for the server')
-AddOption('--dbg', action='append_const', dest='cflags', const='-g -Og')
+AddOption('--dbg', action='append_const', dest='cflags', const='-ggdb -Og')
 AddOption('--opt', action='append_const', dest='cflags', const='-O3')
 
 #
