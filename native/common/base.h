@@ -21,8 +21,12 @@
 #include <boost/format.hpp>
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/stringize.hpp>
+#include <chrono>
 
 namespace ruralpi {
+
+using Milliseconds = std::chrono::milliseconds;
+using Seconds = std::chrono::seconds;
 
 /**
  * Determines at compile time whether the processor is little or big endian

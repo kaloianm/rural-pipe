@@ -31,10 +31,8 @@
 namespace ruralpi {
 namespace {
 
-using Milliseconds = std::chrono::milliseconds;
-
-const std::chrono::seconds kWaitForData(5);
-const std::chrono::milliseconds kWaitForFullerBatch(5);
+const Seconds kWaitForData(5);
+const Milliseconds kWaitForFullerBatch(5);
 
 std::string debugLogDatagram(uint8_t const *data, size_t size) {
     std::stringstream ss;
@@ -74,6 +72,8 @@ TunnelProducerConsumer::TunnelProducerConsumer(std::vector<FileDescriptor> tunne
         boost::asio::post(_pool, [this, i] {
             auto &fd = _tunnelFds[i];
             BOOST_LOG_NAMED_SCOPE("_receiveFromTunnelLoop");
+
+            fd.makeNonBlocking();
 
             try {
                 _receiveFromTunnelLoop(i);
@@ -150,7 +150,8 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(int idxTunnelFds) {
                     << numDatagramsWritten << " datagrams received so far)";
 
                 res = tunnelFd.poll(numDatagramsWritten ? Milliseconds(kWaitForFullerBatch)
-                                                        : Milliseconds(kWaitForData));
+                                                        : Milliseconds(kWaitForData),
+                                    POLLIN);
                 if (res > 0)
                     break;
                 if (numDatagramsWritten) // res == 0

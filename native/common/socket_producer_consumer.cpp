@@ -211,7 +211,9 @@ void SocketProducerConsumer::_receiveFromSocketLoop(Session &session, TunnelFram
 
 SocketProducerConsumer::Session::Session(SessionId sessionId) : sessionId(std::move(sessionId)) {}
 
-TunnelFrameStream::TunnelFrameStream(ScopedFileDescriptor fd) : _fd(std::move(fd)) {}
+TunnelFrameStream::TunnelFrameStream(ScopedFileDescriptor fd) : _fd(std::move(fd)) {
+    _fd.makeNonBlocking();
+}
 
 TunnelFrameStream::TunnelFrameStream(TunnelFrameStream &&) = default;
 
@@ -220,7 +222,7 @@ TunnelFrameStream::~TunnelFrameStream() = default;
 void TunnelFrameStream::send(TunnelFrameBuffer buf) {
     int numWritten = 0;
     while (numWritten < buf.size) {
-        numWritten += _fd.write((void const *)buf.data, buf.size);
+        numWritten += _fd.write((void const *)&buf.data[numWritten], buf.size - numWritten);
     }
 
     BOOST_LOG_TRIVIAL(trace) << "Sent frame of " << numWritten << " bytes";
@@ -228,7 +230,6 @@ void TunnelFrameStream::send(TunnelFrameBuffer buf) {
 
 TunnelFrameBuffer TunnelFrameStream::receive() {
     size_t numRead = 0;
-
     while (numRead < sizeof(TunnelFrameHeaderInfo)) {
         numRead += _fd.read((void *)&_buffer[numRead], sizeof(TunnelFrameHeaderInfo) - numRead);
     }

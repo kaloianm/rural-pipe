@@ -35,7 +35,9 @@ class Service:
 
         print(f'Starting service {self.name}')
 
-        config = ConfigParser()
+        # TODO: Strict is set to False here because the Boost options_parser requires multiple
+        # repeated lines
+        config = ConfigParser(strict=False)
         config_files_read = config.read(f'{name}.cfg')
         if len(config_files_read) > 0:
             print(f'Reading options from {config_files_read}')

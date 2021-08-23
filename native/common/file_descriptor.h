@@ -20,7 +20,6 @@
 
 #include <fcntl.h>
 #include <string>
-#include <chrono>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -41,11 +40,16 @@ public:
     FileDescriptor(const FileDescriptor &);
     FileDescriptor(FileDescriptor &&);
 
-    int availableToRead();
-    int read(void *buf, size_t nbytes);
-    int write(void const *buf, size_t size);
+    void makeNonBlocking();
 
-    int poll(std::chrono::milliseconds timeout);
+    int availableToRead();
+    int readNonBlocking(void *buf, size_t nbytes);
+    int read(void *buf, size_t nbytes);
+
+    int writeNonBlocking(void const *buf, size_t nbytes);
+    int write(void const *buf, size_t nbytes);
+
+    int poll(Milliseconds timeout, short events);
 
     operator int() const { return _fd; }
 

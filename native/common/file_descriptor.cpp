@@ -42,31 +42,68 @@ FileDescriptor::FileDescriptor(FileDescriptor &&other) {
     other._fd = -1;
 }
 
+void FileDescriptor::makeNonBlocking() {
+    int flags = SYSCALL(::fcntl(_fd, F_GETFL));
+    SYSCALL(::fcntl(_fd, F_SETFL, flags | O_NONBLOCK));
+}
+
 int FileDescriptor::availableToRead() {
     int nAvailable;
     SYSCALL(::ioctl(_fd, FIONREAD, &nAvailable));
     return nAvailable;
 }
 
+int FileDescriptor::readNonBlocking(void *buf, size_t nbytes) {
+    int nRead = ::read(_fd, buf, nbytes);
+    if (nRead < 0 && (errno == EWOULDBLOCK || errno == EAGAIN))
+        return nRead;
+
+    SYSCALL_MSG(nRead, boost::format("Failed to read from file descriptor (%d): %s") % _fd % _desc);
+    return nRead;
+}
+
 int FileDescriptor::read(void *buf, size_t nbytes) {
-    int res =
-        SYSCALL_MSG(::read(_fd, buf, nbytes),
-                    boost::format("Failed to read from file descriptor (%d): %s") % _fd % _desc);
-    if (res == 0)
-        throw SystemException(boost::format("Failed to read from closed file descriptor (%d): %s") %
-                              _fd % _desc);
-    return res;
+    while (true) {
+        int nRead = readNonBlocking(buf, nbytes);
+        if (nRead > 0) {
+            return nRead;
+        } else if (nRead == 0) {
+            throw SystemException(
+                boost::format("Failed to read from closed file descriptor (%d): %s") % _fd % _desc);
+        } else if (nRead < 0 && (errno == EWOULDBLOCK || errno == EAGAIN)) {
+            poll(Milliseconds(-1), POLLIN);
+        }
+    }
 }
 
-int FileDescriptor::write(void const *buf, size_t size) {
-    return SYSCALL_MSG(::write(_fd, buf, size),
-                       boost::format("Failed to write on file descriptor (%d): %s") % _fd % _desc);
+int FileDescriptor::writeNonBlocking(void const *buf, size_t nbytes) {
+    int nWritten = ::write(_fd, buf, nbytes);
+    if (nWritten < 0 && (errno == EWOULDBLOCK || errno == EAGAIN))
+        return nWritten;
+
+    SYSCALL_MSG(nWritten,
+                boost::format("Failed to write to file descriptor (%d): %s") % _fd % _desc);
+    return nWritten;
 }
 
-int FileDescriptor::poll(std::chrono::milliseconds timeout) {
+int FileDescriptor::write(void const *buf, size_t nbytes) {
+    while (true) {
+        int nWritten = writeNonBlocking(buf, nbytes);
+        if (nWritten > 0) {
+            return nWritten;
+        } else if (nWritten == 0) {
+            throw SystemException(
+                boost::format("Failed to write to closed file descriptor (%d): %s") % _fd % _desc);
+        } else if (nWritten < 0 && (errno == EWOULDBLOCK || errno == EAGAIN)) {
+            poll(Milliseconds(-1), POLLOUT);
+        }
+    }
+}
+
+int FileDescriptor::poll(Milliseconds timeout, short events) {
     pollfd fd;
     fd.fd = _fd;
-    fd.events = POLLIN;
+    fd.events = events;
     return SYSCALL(::poll(&fd, 1, timeout.count()));
 }
 
