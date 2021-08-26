@@ -145,13 +145,13 @@ void TunnelFramePipe::pipeInvokePrev(TunnelFrameBuffer buf) { _prev->onTunnelFra
 void TunnelFramePipe::pipeInvokeNext(TunnelFrameBuffer buf) {
     TunnelFramePipe *next;
     {
-        std::lock_guard<std::mutex> lg(_mutex);
+        std::lock_guard lg(_mutex);
         if (!_nextIsDetaching)
             _numCallsToNext++;
         next = _next;
     }
     ScopedGuard sg([&] {
-        std::lock_guard<std::mutex> lg(_next->_mutex);
+        std::lock_guard lg(_next->_mutex);
         if (0 == --_numCallsToNext && _nextIsDetaching)
             _cv.notify_all();
     });
@@ -173,7 +173,7 @@ void TunnelFramePipe::pipePop() {
     RASSERT(_prev->_next == this);
 
     {
-        std::unique_lock<std::mutex> ul(_prev->_mutex);
+        std::unique_lock ul(_prev->_mutex);
         _prev->_nextIsDetaching = true;
         _prev->_next = &kNotYetReadyTunnelFramePipe;
         _prev->_cv.wait(ul, [&] { return _prev->_numCallsToNext == 0; });

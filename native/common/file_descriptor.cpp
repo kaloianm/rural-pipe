@@ -35,11 +35,15 @@ FileDescriptor::FileDescriptor(const std::string &desc, int fd) : _desc(desc), _
 
 FileDescriptor::FileDescriptor(const FileDescriptor &) = default;
 
-FileDescriptor::FileDescriptor(FileDescriptor &&other) {
+FileDescriptor::FileDescriptor(FileDescriptor &&other) { *this = std::move(other); }
+
+FileDescriptor &FileDescriptor::operator=(FileDescriptor &&other) {
     _desc = std::move(other._desc);
 
     _fd = other._fd;
     other._fd = -1;
+
+    return *this;
 }
 
 void FileDescriptor::makeNonBlocking() {
@@ -114,16 +118,21 @@ ScopedFileDescriptor::ScopedFileDescriptor(const std::string &desc, int fd)
 
 ScopedFileDescriptor::ScopedFileDescriptor(ScopedFileDescriptor &&other) = default;
 
-ScopedFileDescriptor::~ScopedFileDescriptor() {
+ScopedFileDescriptor &ScopedFileDescriptor::operator=(ScopedFileDescriptor &&) = default;
+
+ScopedFileDescriptor::~ScopedFileDescriptor() { close(); }
+
+void ScopedFileDescriptor::close() {
     if (_fd > 0) {
         BOOST_LOG_TRIVIAL(debug) << boost::format("File descriptor closed (%d): %s") % _fd % _desc;
 
-        if (close(_fd) < 0) {
+        if (::close(_fd) < 0) {
             BOOST_LOG_TRIVIAL(debug)
                 << (boost::format("File descriptor close failed (%d): %s") % _fd % _desc) << ": "
                 << SystemException::getLastError();
         }
 
+        _fd = -1;
         return;
     } else if (_fd == -1) {
         return;

@@ -22,7 +22,7 @@
 #include <boost/asio/thread_pool.hpp>
 #include <boost/functional/hash.hpp>
 #include <list>
-#include <mutex>
+#include <shared_mutex>
 #include <unordered_map>
 
 #include "common/compressing_tunnel_frame_pipe.h"
@@ -56,7 +56,15 @@ public:
      */
     TunnelFrameBuffer receive();
 
-    std::string toString() const { return _fd.toString(); }
+    /**
+     * Closes the underlying file description.
+     */
+    void close();
+
+    /**
+     * Returns a string represenation of the stream, for debugging purposes.
+     */
+    const std::string &toString() const { return _fd.toString(); }
 
 private:
     ScopedFileDescriptor _fd;
@@ -94,7 +102,6 @@ private:
 
         const SessionId sessionId;
 
-        std::mutex mutex;
         std::list<TunnelFrameStream> streams;
     };
     using SessionsMap = std::unordered_map<SessionId, Session, boost::hash<SessionId>>;
@@ -116,11 +123,11 @@ private:
     // Set of threads draining the streams from `_streams`
     boost::asio::thread_pool _pool;
 
-    // Associated with the `_receiveFromSocketLoop`
-    std::atomic<bool> _interrupted{false};
+    // Associated with the `_receiveFromSocketLoop` method
+    std::atomic_bool _interrupted{false};
 
     // Mutex to protect access to the state below
-    std::mutex _mutex;
+    std::shared_mutex _mutex;
 
     // Set of streams to the connected clients or server
     SessionsMap _sessions;

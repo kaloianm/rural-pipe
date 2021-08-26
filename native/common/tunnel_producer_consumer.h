@@ -78,7 +78,7 @@ private:
     std::mutex _mutex;
 
     // Associated with the `_receiveFromTunnelLoop` method
-    std::atomic<bool> _interrupted{false};
+    std::atomic_bool _interrupted{false};
 };
 
 } // namespace ruralpi

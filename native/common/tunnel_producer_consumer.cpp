@@ -67,7 +67,7 @@ TunnelProducerConsumer::TunnelProducerConsumer(std::vector<FileDescriptor> tunne
     for (int i = 0; i < _tunnelFds.size(); i++) {
         BOOST_LOG_TRIVIAL(info) << "Starting thread for tunnel file descriptor " << _tunnelFds[i];
 
-        std::lock_guard<std::mutex> lg(_mutex);
+        std::lock_guard lg(_mutex);
 
         boost::asio::post(_pool, [this, i] {
             auto &fd = _tunnelFds[i];

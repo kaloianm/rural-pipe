@@ -21,7 +21,7 @@ Import('env')
 
 native_env = env.Clone()
 native_env.Append(CPPPATH=[native_env.Dir('.').srcnode()])
-native_env.Append(CXXFLAGS=['-std=c++14'])
+native_env.Append(CXXFLAGS=['-std=c++17'])
 native_env.Append(CPPDEFINES=['BOOST_FILESYSTEM_NO_DEPRECATED'])
 
 architectures = native_env['ARCHITECTURES']

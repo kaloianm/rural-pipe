@@ -39,6 +39,7 @@ public:
 
     FileDescriptor(const FileDescriptor &);
     FileDescriptor(FileDescriptor &&);
+    FileDescriptor &operator=(FileDescriptor &&);
 
     void makeNonBlocking();
 
@@ -72,7 +73,13 @@ public:
     ScopedFileDescriptor(const std::string &desc, int fd);
 
     ScopedFileDescriptor(ScopedFileDescriptor &&);
+    ScopedFileDescriptor &operator=(ScopedFileDescriptor &&);
     ~ScopedFileDescriptor();
+
+    /**
+     * Closes the underlying file descriptor. This method is safe to call multiple times.
+     */
+    void close();
 };
 
 } // namespace ruralpi

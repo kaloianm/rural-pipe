@@ -146,7 +146,7 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
             return;
         }
 
-        std::unique_lock<std::mutex> ul(_mutex);
+        std::unique_lock ul(_mutex);
 
         auto &session = [&]() -> auto & {
             auto it = _sessions.find(ier.sessionId);
@@ -159,7 +159,9 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
         auto it = session.streams.emplace(session.streams.end(), std::move(s));
 
         ScopedGuard sg([this, sessionId = ier.sessionId, itStream = it] {
-            std::lock_guard<std::mutex> lg(_mutex);
+            itStream->close();
+
+            std::lock_guard lg(_mutex);
             auto it = _sessions.find(sessionId);
             it->second.streams.erase(itStream);
             if (it->second.streams.empty())
@@ -185,7 +187,7 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
 }
 
 void SocketProducerConsumer::onTunnelFrameFromPrev(TunnelFrameBuffer buf) {
-    std::lock_guard<std::mutex> lg(_mutex);
+    std::lock_guard lg(_mutex);
 
     if (_sessions.empty())
         throw NotYetReadyException("The other side of the tunnel is not connected yet");
@@ -217,7 +219,9 @@ TunnelFrameStream::TunnelFrameStream(ScopedFileDescriptor fd) : _fd(std::move(fd
 
 TunnelFrameStream::TunnelFrameStream(TunnelFrameStream &&) = default;
 
-TunnelFrameStream::~TunnelFrameStream() = default;
+TunnelFrameStream::~TunnelFrameStream() { close(); }
+
+void TunnelFrameStream::close() { _fd.close(); }
 
 void TunnelFrameStream::send(TunnelFrameBuffer buf) {
     int numWritten = 0;

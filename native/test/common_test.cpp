@@ -225,7 +225,7 @@ BOOST_AUTO_TEST_CASE(Tests) {
         void onTunnelFrameFromPrev(TunnelFrameBuffer buf) override {
             TLOG << "Received tunnel frame of " << buf.size << " bytes";
 
-            std::lock_guard<std::mutex> lg(mutex);
+            std::lock_guard lg(mutex);
             memcpy(lastFrameReceived, buf.data, buf.size);
             lastFrameReceivedSize = buf.size;
             ++numFramesReceived;
@@ -234,7 +234,7 @@ BOOST_AUTO_TEST_CASE(Tests) {
         void onTunnelFrameFromNext(TunnelFrameBuffer buf) override { RASSERT(false); }
 
         int getNumFramesReceived() {
-            std::lock_guard<std::mutex> lg(mutex);
+            std::lock_guard lg(mutex);
             return numFramesReceived;
         }
 

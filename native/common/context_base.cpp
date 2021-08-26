@@ -103,7 +103,7 @@ ContextBase::ShouldStart ContextBase::start(int argc, const char *argv[],
 void ContextBase::signalReady() { std::cout << "Rural Pipe running" << std::endl; }
 
 int ContextBase::waitForExit() {
-    std::unique_lock<std::mutex> ul(_mutex);
+    std::unique_lock ul(_mutex);
     while (!_exitCode) {
         _condVar.wait(ul);
     }
@@ -112,7 +112,7 @@ int ContextBase::waitForExit() {
 }
 
 void ContextBase::exit(int exitCode) {
-    std::unique_lock<std::mutex> ul(_mutex);
+    std::unique_lock ul(_mutex);
     if (_exitCode)
         return;
     _exitCode = exitCode;
