@@ -21,7 +21,9 @@
 #include <atomic>
 #include <boost/asio/thread_pool.hpp>
 #include <boost/functional/hash.hpp>
+#include <condition_variable>
 #include <list>
+#include <mutex>
 #include <shared_mutex>
 #include <unordered_map>
 
@@ -64,7 +66,7 @@ public:
     /**
      * Returns a string represenation of the stream, for debugging purposes.
      */
-    const std::string &toString() const { return _fd.toString(); }
+    std::string toString() const { return _fd.toString(); }
 
 private:
     ScopedFileDescriptor _fd;
@@ -78,6 +80,12 @@ private:
  */
 class SocketProducerConsumer : public TunnelFramePipe {
 public:
+    /**
+     * Constructs a new socket producer/consumer either as a client (where clientSessionId is set)
+     * or as a server (where clientSessionId is not set). The difference is that when run as a
+     * client, no mapping will be kept between outbound requests in order to differentiate for which
+     * clients they need to be dispatched.
+     */
     SocketProducerConsumer(boost::optional<SessionId> clientSessionId, TunnelFramePipe &prev);
     ~SocketProducerConsumer();
 
@@ -92,6 +100,21 @@ private:
     void onTunnelFrameFromNext(TunnelFrameBuffer buf) override;
 
     /**
+     * Tracks the state of a particular stream under a given session.
+     */
+    struct StreamTracker {
+        StreamTracker(TunnelFrameStream stream) : stream(std::move(stream)) {}
+
+        TunnelFrameStream stream;
+
+        bool inUse{false};
+        size_t bytesSending{0};
+
+        // Statistics tracking
+        std::atomic_uint64_t bytesSent{0};
+    };
+
+    /**
      * Encapsulates the entire runtime state of a session between a client and server.
      */
     struct Session {
@@ -102,7 +125,11 @@ private:
 
         const SessionId sessionId;
 
-        std::list<TunnelFrameStream> streams;
+        std::mutex mutex;
+        std::condition_variable cv;
+
+        using StreamsList = std::list<std::shared_ptr<StreamTracker>>;
+        StreamsList streams;
     };
     using SessionsMap = std::unordered_map<SessionId, Session, boost::hash<SessionId>>;
 

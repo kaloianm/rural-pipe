@@ -41,6 +41,9 @@ Context::ShouldStart Context::start(int argc, const char *argv[]) {
         ContextBase::start(argc, argv, [this](auto args) { return _onCommand(args); });
     if (shouldStart == kYes) {
         port = _vm["settings.port"].as<int>();
+        if (nqueues == 0) {
+            nqueues = 2;
+        }
     }
 
     return shouldStart;

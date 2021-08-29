@@ -143,16 +143,17 @@ TunnelFramePipe::TunnelFramePipe(std::string desc, TunnelFramePipe *prev, Tunnel
 void TunnelFramePipe::pipeInvokePrev(TunnelFrameBuffer buf) { _prev->onTunnelFrameFromNext(buf); }
 
 void TunnelFramePipe::pipeInvokeNext(TunnelFrameBuffer buf) {
-    TunnelFramePipe *next;
-    {
-        std::lock_guard lg(_mutex);
-        if (!_nextIsDetaching)
-            _numCallsToNext++;
-        next = _next;
-    }
+    std::unique_lock ul(_mutex);
+
+    ++_numCallsToNext;
+    TunnelFramePipe *next = _next;
+
+    ul.unlock();
+
     ScopedGuard sg([&] {
-        std::lock_guard lg(_next->_mutex);
-        if (0 == --_numCallsToNext && _nextIsDetaching)
+        ul.lock();
+
+        if (--_numCallsToNext == 0 && _nextIsDetaching)
             _cv.notify_all();
     });
 

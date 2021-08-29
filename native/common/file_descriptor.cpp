@@ -22,6 +22,7 @@
 
 #include <boost/log/trivial.hpp>
 #include <poll.h>
+#include <sstream>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -109,6 +110,12 @@ int FileDescriptor::poll(Milliseconds timeout, short events) {
     fd.fd = _fd;
     fd.events = events;
     return SYSCALL(::poll(&fd, 1, timeout.count()));
+}
+
+std::string FileDescriptor::toString() const {
+    std::stringstream ss;
+    ss << _desc << " (fd " << _fd << ')';
+    return ss.str();
 }
 
 ScopedFileDescriptor::ScopedFileDescriptor(const std::string &desc, int fd)

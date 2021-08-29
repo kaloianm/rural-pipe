@@ -47,6 +47,9 @@ Context::ShouldStart Context::start(int argc, const char *argv[]) {
         serverHost = _vm["settings.server_host"].as<std::string>();
         serverPort = _vm["settings.server_port"].as<int>();
         interfaces = _vm["settings.interfaces"].as<std::vector<std::string>>();
+        if (nqueues == 0) {
+            nqueues = interfaces.size();
+        }
     }
 
     return shouldStart;

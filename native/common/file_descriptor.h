@@ -54,7 +54,7 @@ public:
 
     operator int() const { return _fd; }
 
-    const std::string &toString() const { return _desc; }
+    std::string toString() const;
 
 protected:
     // Description used for debugging and diagnostics purposes

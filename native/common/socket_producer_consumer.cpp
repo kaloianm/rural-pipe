@@ -109,6 +109,13 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
         BOOST_LOG_TRIVIAL(warning)
             << "File descriptor " << config.fd.toString() << " is not a socket";
     else {
+
+        {
+            constexpr int sendBufSize = 2 * kTunnelFrameMaxSize;
+            SYSCALL(
+                ::setsockopt(config.fd, SOL_SOCKET, SO_SNDBUF, &sendBufSize, sizeof(sendBufSize)));
+        }
+
         int recvBufSize;
         {
             int recvBufSizeLen = sizeof(recvBufSize);
@@ -148,6 +155,9 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
 
         std::unique_lock ul(_mutex);
 
+        // This reference is guaranteed to stay in place until 'sg' below is destroyed. This in turn
+        // ensures that the only user of that reference (_receiveFromSocketLoop) will never access a
+        // deleted pointer.
         auto &session = [&]() -> auto & {
             auto it = _sessions.find(ier.sessionId);
             if (it == _sessions.end())
@@ -156,10 +166,12 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
         }
         ();
 
-        auto it = session.streams.emplace(session.streams.end(), std::move(s));
+        auto it = session.streams.emplace(session.streams.end(),
+                                          std::make_shared<StreamTracker>(std::move(s)));
+        auto st = *it;
 
         ScopedGuard sg([this, sessionId = ier.sessionId, itStream = it] {
-            itStream->close();
+            (*itStream)->stream.close();
 
             std::lock_guard lg(_mutex);
             auto it = _sessions.find(sessionId);
@@ -168,33 +180,73 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
                 _sessions.erase(it);
         });
 
-        auto &stream = *it;
-
         ul.unlock();
 
         try {
-            _receiveFromSocketLoop(session, stream);
+            _receiveFromSocketLoop(session, st->stream);
 
             RASSERT_MSG(false,
                         boost::format(
                             "Thread for socket %s exited normally. This should never be reached.") %
-                            stream.toString());
+                            st->stream.toString());
         } catch (const std::exception &ex) {
-            BOOST_LOG_TRIVIAL(info)
-                << "Thread for socket " << stream.toString() << " completed due to " << ex.what();
+            BOOST_LOG_TRIVIAL(info) << "Thread for socket " << st->stream.toString()
+                                    << " completed due to " << ex.what();
         }
     });
 }
 
 void SocketProducerConsumer::onTunnelFrameFromPrev(TunnelFrameBuffer buf) {
-    std::lock_guard lg(_mutex);
+    std::shared_lock sl(_mutex);
 
     if (_sessions.empty())
         throw NotYetReadyException("The other side of the tunnel is not connected yet");
 
-    // TODO: Choose a client/server connection to send it on, based on some bandwidth requirements
-    // metric, etc.
-    _sessions.begin()->second.streams.front().send(buf);
+    auto &session = [&]() -> auto & {
+        if (_clientSessionId) {
+            RASSERT(_sessions.size() == 1);
+            return _sessions.begin()->second;
+        } else {
+            // TODO: Keep mapping between source ports in order to differentiate the clients to
+            // which packets need to be dispatched
+            RASSERT(_sessions.size() == 1);
+            return _sessions.begin()->second;
+        }
+    }
+    ();
+
+    std::unique_lock ul(session.mutex);
+
+    auto st = [&] {
+        auto its = (Session::StreamsList::iterator *)alloca(session.streams.size());
+
+        int i = 0;
+        for (auto it = session.streams.begin(); it != session.streams.end(); it++, i++) {
+            if (!(*it)->inUse) {
+                return *it;
+            }
+            its[i] = it;
+        }
+
+        auto &st = *its[0];
+        session.cv.wait(ul, [&] { return !st->inUse; });
+        return st;
+    }();
+
+    st->inUse = true;
+    st->bytesSending += buf.size;
+
+    ul.unlock();
+
+    ScopedGuard sg([&] {
+        ul.lock();
+        st->inUse = false;
+        st->bytesSending -= buf.size;
+        session.cv.notify_one();
+    });
+
+    st->stream.send(buf);
+    st->bytesSent += buf.size;
 }
 
 void SocketProducerConsumer::onTunnelFrameFromNext(TunnelFrameBuffer buf) {
