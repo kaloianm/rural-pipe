@@ -105,8 +105,6 @@ void TunnelProducerConsumer::onTunnelFrameFromPrev(TunnelFrameBuffer buf) {
 void TunnelProducerConsumer::onTunnelFrameFromNext(TunnelFrameBuffer buf) {
     TunnelFrameReader reader(buf);
     while (reader.next()) {
-        // Ensure that the same source/destination address pair always uses the same tunnel device
-        // queue
         int idxTunnelFds = ++_tunnelFdRoundRobin % _tunnelFds.size();
         auto &tunnelFd = _tunnelFds[idxTunnelFds];
         int numWritten = tunnelFd.write(reader.data(), reader.size());
@@ -188,7 +186,6 @@ void TunnelProducerConsumer::_receiveFromTunnelLoop(int idxTunnelFds) {
             ++numDatagramsWritten;
         }
 
-        writer.header().seqNum = _seqNum.fetch_add(1);
         writer.close();
 
         while (true) {

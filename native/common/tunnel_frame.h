@@ -65,7 +65,7 @@ static_assert(sizeof(TunnelFrameHeaderInfo) == 6);
 
 // Every tunnel frame starts with this header
 struct TunnelFrameHeader : public TunnelFrameHeaderInfo {
-    static constexpr uint64_t kInitialSeqNum = 0;
+    static constexpr uint64_t kInitFrameSeqNum = 0;
 
     // For which session does this frame apply
     SessionId sessionId;
@@ -180,6 +180,11 @@ public:
     void append(uint8_t const *ptr, size_t size);
     void append(const char str[]);
     void append(const std::string &str);
+
+    /**
+     * Used to be able to assign a sequence number to a tunnel frame after it has been closed.
+     */
+    static void setSequenceNumberOnClosedBuffer(const TunnelFrameBuffer &buf, uint64_t seqNum);
 
 private:
     uint8_t *const _begin;

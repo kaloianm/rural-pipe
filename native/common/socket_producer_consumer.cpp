@@ -45,7 +45,7 @@ InitialExchangeResult initialTunnelFrameExchange(TunnelFrameStream &stream,
 
         // The client generates the session, the server just accepts it
         writer.header().sessionId = *clientSessionId;
-        writer.header().seqNum = TunnelFrameHeader::kInitialSeqNum;
+        writer.header().seqNum = TunnelFrameHeader::kInitFrameSeqNum;
         strcpy(((char *)((InitTunnelFrame *)writer.data())->identifier), "RuralPipeClient");
         writer.onDatagramWritten(16);
         writer.close();
@@ -64,7 +64,7 @@ InitialExchangeResult initialTunnelFrameExchange(TunnelFrameStream &stream,
 
         TunnelFrameWriter writer({buffer, sizeof(buffer)});
         writer.header().sessionId = reader.header().sessionId;
-        writer.header().seqNum = TunnelFrameHeader::kInitialSeqNum;
+        writer.header().seqNum = TunnelFrameHeader::kInitFrameSeqNum;
         strcpy(((char *)((InitTunnelFrame *)writer.data())->identifier), "RuralPipeServer");
         writer.onDatagramWritten(16);
         writer.close();
@@ -162,8 +162,12 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
         // deleted pointer.
         auto &session = [&]() -> auto & {
             auto it = _sessions.find(ier.sessionId);
-            if (it == _sessions.end())
+            if (it == _sessions.end()) {
+                if (!_sessions.empty())
+                    throw Exception("Currently only one session is supported per server instance");
+
                 it = _sessions.emplace(ier.sessionId, ier.sessionId).first;
+            }
             return it->second;
         }
         ();
@@ -175,11 +179,19 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
         ScopedGuard sg([this, sessionId = ier.sessionId, itStream = it] {
             (*itStream)->stream.close();
 
-            std::lock_guard lg(_mutex);
+            std::unique_lock ul(_mutex);
+
             auto it = _sessions.find(sessionId);
             it->second.streams.erase(itStream);
-            if (it->second.streams.empty())
+
+            bool eraseSession = it->second.streams.empty();
+            if (eraseSession)
                 _sessions.erase(it);
+
+            ul.unlock();
+
+            if (eraseSession)
+                BOOST_LOG_TRIVIAL(info) << "Session " << sessionId << " closed";
         });
 
         ul.unlock();
@@ -216,6 +228,8 @@ void SocketProducerConsumer::onTunnelFrameFromPrev(TunnelFrameBuffer buf) {
         }
     }
     ();
+
+    TunnelFrameWriter::setSequenceNumberOnClosedBuffer(buf, session.nextSeqNum++);
 
     std::unique_lock ul(session.mutex);
 

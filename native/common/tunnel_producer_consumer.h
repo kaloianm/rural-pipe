@@ -71,9 +71,6 @@ private:
     // Set of threads draining the file descriptors from `_tunnelFds`
     boost::asio::thread_pool _pool;
 
-    // Serves as a source for sequencing the tunnel frames
-    std::atomic_uint64_t _seqNum{0};
-
     // Mutex to protect access to the state below
     std::mutex _mutex;
 

@@ -125,6 +125,8 @@ private:
 
         const SessionId sessionId;
 
+        std::atomic_uint64_t nextSeqNum{TunnelFrameHeader::kInitFrameSeqNum + 1};
+
         std::mutex mutex;
         std::condition_variable cv;
 

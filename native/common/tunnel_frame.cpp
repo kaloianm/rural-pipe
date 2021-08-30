@@ -118,6 +118,11 @@ void TunnelFrameWriter::append(const std::string &str) {
     append((uint8_t const *)str.c_str(), str.size());
 }
 
+void TunnelFrameWriter::setSequenceNumberOnClosedBuffer(const TunnelFrameBuffer &buf,
+                                                        uint64_t seqNum) {
+    ((TunnelFrameHeader *)buf.data)->seqNum = seqNum;
+}
+
 class TunnelFramePipe::NotYetReadyTunnelFramePipe : public TunnelFramePipe {
 public:
     NotYetReadyTunnelFramePipe() : TunnelFramePipe("NotYetReady", nullptr, nullptr) {}
