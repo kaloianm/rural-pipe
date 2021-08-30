@@ -49,9 +49,17 @@ private:
      */
     void _receiveFromTunnelLoop(int idxTunnelFds);
 
-    // Set of file descriptor provided a construction time, corresponding to the queues of the
+    // Set of file descriptors provided at construction time, corresponding to the queues of the
     // tunnel device
-    std::vector<FileDescriptor> _tunnelFds;
+    struct FileDescriptorTracker {
+        FileDescriptorTracker(FileDescriptor fd) : fd(std::move(fd)) {}
+
+        std::mutex mutex;
+        FileDescriptor fd;
+    };
+    std::vector<std::optional<FileDescriptorTracker>> _tunnelFds;
+
+    // Stores the MTU of the tunnel device
     int _mtu;
 
     // Used to select the output queue on which to send a datagram in a round-robin fashion

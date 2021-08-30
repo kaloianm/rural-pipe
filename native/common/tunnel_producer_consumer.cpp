@@ -62,10 +62,14 @@ std::string debugLogDatagram(uint8_t const *data, size_t size) {
 } // namespace
 
 TunnelProducerConsumer::TunnelProducerConsumer(std::vector<FileDescriptor> tunnelFds, int mtu)
-    : TunnelFramePipe("Tunnel"), _tunnelFds(std::move(tunnelFds)), _mtu(mtu),
-      _stats(_tunnelFds.size()) {
+    : TunnelFramePipe("Tunnel"), _tunnelFds(tunnelFds.size()), _mtu(mtu), _stats(tunnelFds.size()) {
+    for (int i = 0; i < tunnelFds.size(); i++) {
+        _tunnelFds[i].emplace(std::move(tunnelFds[i]));
+    }
+
     for (int i = 0; i < _tunnelFds.size(); i++) {
-        BOOST_LOG_TRIVIAL(info) << "Starting thread for tunnel file descriptor " << _tunnelFds[i];
+        BOOST_LOG_TRIVIAL(info) << "Starting thread for tunnel file descriptor "
+                                << _tunnelFds[i]->fd;
 
         std::lock_guard lg(_mutex);
 
@@ -73,16 +77,16 @@ TunnelProducerConsumer::TunnelProducerConsumer(std::vector<FileDescriptor> tunne
             auto &fd = _tunnelFds[i];
             BOOST_LOG_NAMED_SCOPE("_receiveFromTunnelLoop");
 
-            fd.makeNonBlocking();
+            fd->fd.makeNonBlocking();
 
             try {
                 _receiveFromTunnelLoop(i);
 
                 RASSERT_MSG(false, boost::format("Thread for tunnel device %s exited normally. "
                                                  "This should never be reached.") %
-                                       fd.toString());
+                                       fd->fd.toString());
             } catch (const std::exception &ex) {
-                BOOST_LOG_TRIVIAL(info) << "Thread for tunnel device " << fd.toString()
+                BOOST_LOG_TRIVIAL(info) << "Thread for tunnel device " << fd->fd.toString()
                                         << " completed due to " << ex.what();
             }
         });
@@ -107,16 +111,20 @@ void TunnelProducerConsumer::onTunnelFrameFromNext(TunnelFrameBuffer buf) {
     while (reader.next()) {
         int idxTunnelFds = ++_tunnelFdRoundRobin % _tunnelFds.size();
         auto &tunnelFd = _tunnelFds[idxTunnelFds];
-        int numWritten = tunnelFd.write(reader.data(), reader.size());
+        int numWritten = [&] {
+            std::lock_guard lg(tunnelFd->mutex);
+            return tunnelFd->fd.write(reader.data(), reader.size());
+        }();
+
         _stats.bytesOut[idxTunnelFds] += numWritten;
         BOOST_LOG_TRIVIAL(trace) << "Wrote " << numWritten << " byte datagram to tunnel socket "
-                                 << tunnelFd << ": "
+                                 << tunnelFd->fd << ": "
                                  << debugLogDatagram(reader.data(), reader.size());
     }
 }
 
 void TunnelProducerConsumer::_receiveFromTunnelLoop(int idxTunnelFds) {
-    FileDescriptor &tunnelFd = _tunnelFds[idxTunnelFds];
+    auto &tunnelFd = _tunnelFds[idxTunnelFds]->fd;
 
     uint8_t buffer[kTunnelFrameMaxSize];
     uint8_t *mtuBuffer = (uint8_t *)alloca(_mtu);
