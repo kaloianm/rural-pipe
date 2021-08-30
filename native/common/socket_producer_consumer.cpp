@@ -109,7 +109,9 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
         BOOST_LOG_TRIVIAL(warning)
             << "File descriptor " << config.fd.toString() << " is not a socket";
     else {
-
+        // This configuration allows up to 2 frames to be placed in the outgoing buffer for the
+        // socket before it will block. This ensures that the socket selection algorithm will move
+        // on to the next available socket.
         {
             constexpr int sendBufSize = 2 * kTunnelFrameMaxSize;
             SYSCALL(
@@ -237,9 +239,12 @@ void SocketProducerConsumer::onTunnelFrameFromPrev(TunnelFrameBuffer buf) {
     st->bytesSending += buf.size;
 
     ul.unlock();
+    sl.unlock();
 
     ScopedGuard sg([&] {
+        sl.lock();
         ul.lock();
+
         st->inUse = false;
         st->bytesSending -= buf.size;
         session.cv.notify_one();
