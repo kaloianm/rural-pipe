@@ -109,13 +109,17 @@ void SocketProducerConsumer::addSocket(SocketConfig config) {
         BOOST_LOG_TRIVIAL(warning)
             << "File descriptor " << config.fd.toString() << " is not a socket";
     else {
-        // This configuration allows up to 2 frames to be placed in the outgoing buffer for the
-        // socket before it will block. This ensures that the socket selection algorithm will move
-        // on to the next available socket.
+        // This configuration allows up to the below configured number of frames to be placed in the
+        // outgoing buffer for the socket before it will block. This ensures that the socket
+        // selection algorithm will move on to the next available socket.
         {
-            constexpr int sendBufSize = 2 * kTunnelFrameMaxSize;
-            SYSCALL(
-                ::setsockopt(config.fd, SOL_SOCKET, SO_SNDBUF, &sendBufSize, sizeof(sendBufSize)));
+            constexpr int kSendBufSize = 2 * kTunnelFrameMaxSize;
+            SYSCALL(::setsockopt(config.fd, SOL_SOCKET, SO_SNDBUF, &kSendBufSize,
+                                 sizeof(kSendBufSize)));
+
+            constexpr int kTCPNoDelay = 1;
+            SYSCALL(::setsockopt(config.fd, IPPROTO_TCP, TCP_NODELAY, &kTCPNoDelay,
+                                 sizeof(kTCPNoDelay)));
         }
 
         int recvBufSize;
