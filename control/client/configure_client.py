@@ -184,11 +184,6 @@ iface {USBWAN} inet dhcp
 manual {MOBILEWAN}
 iface {MOBILEWAN} inet manual
   metric 30
-  pre-up ifconfig {MOBILEWAN} down
-  pre-up /snap/bin/mmcli -m 0 --enable
-  pre-up /snap/bin/mmcli -m 0 -b 0 --connect
-  pre-up udhcpc -i {MOBILEWAN}
-  post-down /snap/bin/mmcli -m 0 -b 0 --disconnect
 
 {''.join(map(lambda ifname: f'iface {ifname} inet manual' + chr(10), LAN + [WLAN24GHZ]))}
 
@@ -201,13 +196,54 @@ iface br0 inet static
   bridge_stp 0
   """)
 
+rewrite_config_file(
+    f'/etc/network/if-pre-up.d/pre-up-{MOBILEWAN}', f"""
+#!/bin/sh
+
+if [ "$IFACE" != "{MOBILEWAN}" ]; then
+  exit 0
+fi
+
+ifconfig $IFACE down
+
+MODEM_PATH=`/snap/bin/mmcli --list-modems | awk '{{ print $1; }}'`
+MODEM_ID=`echo "$MODEM_PATH" | awk -F'/' '{{ print $6; }}'`
+
+echo "Found modem $MODEM_ID at $MODEM_PATH"
+
+/snap/bin/mmcli -m $MODEM_ID --enable
+/snap/bin/mmcli -m $MODEM_ID --simple-connect='apn=telefonica.es,user=telefonica,password=telefonica'
+udhcpc -i $IFACE
+""")
+
+rewrite_config_file(
+    f'/etc/network/if-pre-up.d/post-down-{MOBILEWAN}', f"""
+#!/bin/sh
+
+if [ "$IFACE" != "{MOBILEWAN}" ]; then
+  exit 0
+fi
+
+ifconfig $IFACE down
+
+MODEM_PATH=`/snap/bin/mmcli --list-modems | awk '{{ print $1; }}'`
+MODEM_ID=`echo "$MODEM_PATH" | awk -F'/' '{{ print $6; }}'`
+
+echo "Found modem $MODEM_ID at $MODEM_PATH"
+
+/snap/bin/mmcli -m $MODEM_ID --enable
+/snap/bin/mmcli -m $MODEM_ID --simple-connect='apn=telefonica.es,user=telefonica,password=telefonica'
+udhcpc -i $IFACE
+""")
+
 # 4. Configure the DNS/DHCP server
 rewrite_config_file(
     '/etc/dnsmasq.conf', f"""
 interface=br0
 dhcp-range=br0,192.168.4.10,192.168.4.200,255.255.255.0,12h
-dhcp-host=b0:4e:26:85:04:0c,192.168.4.10
-dhcp-host=c0:c9:e3:e2:c4:e1,192.168.4.11
+dhcp-host=b0:4e:26:85:04:0c,192.168.4.10    # TP-Link Archer C9 Router (Salon)
+dhcp-host=c0:c9:e3:e2:c4:e1,192.168.4.11    # TP-Link AC750 Router (TV Room)
+dhcp-host=f0:18:98:3d:4e:95,192.168.4.12    # Macbook Pro 2015
 
 domain=rural
 
