@@ -35,7 +35,7 @@ export BOOST_ARCHIVE="$HOME/Downloads/boost_${VERSION//./_}.tar.bz2"
 
 if [ ! -f "$BOOST_ARCHIVE" ]; then
     echo "Downloading Boost archive to $BOOST_ARCHIVE ..."
-    wget --directory-prefix "$HOME/Downloads" "https://dl.bintray.com/boostorg/release/1.74.0/source/boost_${VERSION//./_}.tar.bz2"
+    wget --directory-prefix "$HOME/Downloads" "https://boostorg.jfrog.io/artifactory/main/release/1.77.0/source/boost_${VERSION//./_}.tar.bz2"
 fi
 
 echo "Extracting Boost archive $BOOST_ARCHIVE ..."
