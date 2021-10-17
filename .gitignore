@@ -1,6 +1,7 @@
 .vscode/browse.vc.*
 build/
 install/
+third_party/
 
 .sconsign.dblite
 boost_for_pc_build.log
