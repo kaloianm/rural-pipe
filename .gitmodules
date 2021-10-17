@@ -1,7 +1,9 @@
 [submodule "boost"]
-  path = "third_party/boost"
-  url = "git@github.com:boostorg/boost.git"
+	path = third_party/boost
+	url = git@github.com:boostorg/boost.git
+	branch = master
 
 [submodule "liburing"]
-  path = "third_party/liburing"
-  url = "git://git.kernel.dk/liburing"
+	path = third_party/liburing
+	url = git://git.kernel.dk/liburing
+	branch = master
