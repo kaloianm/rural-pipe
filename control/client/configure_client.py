@@ -53,8 +53,9 @@ def shell_command(command):
         raise Exception(f'Command failed with code {err_code}: {command}')
 
 
-# Rewrites the entire content of file_name with contents.
-def rewrite_config_file(file_name, contents):
+# Rewrites the entire content of file_name with contents. If 'executable_clause' is not set to None,
+# it must contain a string like '#!/bin/sh', which indicates that the file should be an executable.
+def rewrite_config_file(file_name, contents, executable_clause=None):
     file_name_for_backup = file_name + '.rural-pipe.orig'
     shell_command(f'[ ! -f {file_name} ] || cp {file_name} {file_name_for_backup}')
 
@@ -153,6 +154,7 @@ def check_network_interfaces():
 check_network_interfaces()
 
 # 1. Install the required packages
+# yapf: disable
 shell_command(
     'echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections'
 )
@@ -160,8 +162,15 @@ shell_command(
     'echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections'
 )
 shell_command(
+    'apt update'
+)
+shell_command(
     'apt install -y vim screen dnsmasq hostapd netfilter-persistent iptables-persistent bridge-utils openvpn libqmi-utils udhcpc ifmetric snapd'
 )
+shell_command(
+    'snap install modem-manager'
+)
+# yapf: enable
 
 # 2. Unblock the WLAN device(s) so they can transmit.
 shell_command('rfkill unblock wlan')
@@ -217,23 +226,22 @@ udhcpc -i $IFACE
 """)
 
 rewrite_config_file(
-    f'/etc/network/if-pre-up.d/post-down-{MOBILEWAN}', f"""
+    f'/etc/network/if-post-down.d/post-down-{MOBILEWAN}', f"""
 #!/bin/sh
 
 if [ "$IFACE" != "{MOBILEWAN}" ]; then
   exit 0
 fi
 
-ifconfig $IFACE down
-
 MODEM_PATH=`/snap/bin/mmcli --list-modems | awk '{{ print $1; }}'`
 MODEM_ID=`echo "$MODEM_PATH" | awk -F'/' '{{ print $6; }}'`
 
 echo "Found modem $MODEM_ID at $MODEM_PATH"
 
-/snap/bin/mmcli -m $MODEM_ID --enable
-/snap/bin/mmcli -m $MODEM_ID --simple-connect='apn=telefonica.es,user=telefonica,password=telefonica'
-udhcpc -i $IFACE
+/snap/bin/mmcli -m $MODEM_ID --simple-disconnect
+/snap/bin/mmcli -m $MODEM_ID --disable
+
+ifconfig $IFACE down
 """)
 
 # 4. Configure the DNS/DHCP server
@@ -241,9 +249,17 @@ rewrite_config_file(
     '/etc/dnsmasq.conf', f"""
 interface=br0
 dhcp-range=br0,192.168.4.10,192.168.4.200,255.255.255.0,12h
+
+# BEGIN: Fixed lease hosts
+#
+# To list all the active leases use the following command:
+#   cat /var/lib/misc/dnsmasq.leases
+#
 dhcp-host=b0:4e:26:85:04:0c,192.168.4.10    # TP-Link Archer C9 Router (Salon)
 dhcp-host=c0:c9:e3:e2:c4:e1,192.168.4.11    # TP-Link AC750 Router (TV Room)
-dhcp-host=f0:18:98:3d:4e:95,192.168.4.12    # Macbook Pro 2015
+dhcp-host=f0:18:98:3d:4e:95,192.168.4.12    # Macbook Pro 2015 (Kal's Mac)
+#
+# END: Fixed lease hosts
 
 domain=rural
 
