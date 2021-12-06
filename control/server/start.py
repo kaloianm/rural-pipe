@@ -46,9 +46,8 @@ class ServerService(Service):
             f'iptables -C POSTROUTING -t nat -o {default_gateway[1]} -j MASQUERADE')
         if await ipcmd.wait() > 0:
             raise Exception(
-                f"""NAT is not configured on the default gateway. Please run the following command:
-                            sudo iptables -A POSTROUTING -t nat -o {default_gateway[1]} -j MASQUERADE"""
-            )
+                f"NAT is not configured on the default gateway. Please run the following command: "
+                f"sudo iptables -A POSTROUTING -t nat -o {default_gateway[1]} -j MASQUERADE")
 
     async def post_configure(self):
         pass

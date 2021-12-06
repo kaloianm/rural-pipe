@@ -28,6 +28,8 @@ if os.geteuid() != 0:
     exit("You need to have root privileges to run this script.\n"
          "Please try again, this time using 'sudo'. Exiting.")
 
+routing_table_name = 'rpi'
+
 
 class ClientService(Service):
     def __init__(self):
@@ -41,8 +43,12 @@ class ClientService(Service):
 
     async def post_configure(self):
         ipcmd = await asyncio.create_subprocess_shell(
-            f'ip route add default via {str(self.ip_iface.ip)} dev rpic table rpi')
+            f'ip route add default via {str(self.ip_iface.ip)} dev rpic table {routing_table_name}')
         await ipcmd.wait()
+
+        print(f"Route configuration completed under routing table '{routing_table_name}'. In order "
+              f"to add devices to go through that routing table, use:\n"
+              f"  sudo ip rule add from <IP address> table {routing_table_name}")
 
 
 def main():
