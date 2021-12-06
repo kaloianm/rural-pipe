@@ -313,7 +313,7 @@ rewrite_config_file(
 interface=br0
 dhcp-range=br0,192.168.4.10,192.168.4.200,255.255.255.0,12h
 
-# BEGIN: Fixed lease hosts
+# BEGIN: Fixed IP hosts
 #
 # To list all the active leases use the following command:
 #   cat /var/lib/misc/dnsmasq.leases
@@ -322,7 +322,7 @@ dhcp-host=b0:4e:26:85:04:0c,192.168.4.10    # TP-Link Archer C9 Router (Salon)
 dhcp-host=c0:c9:e3:e2:c4:e1,192.168.4.11    # TP-Link AC750 Router (TV Room)
 dhcp-host=f0:18:98:3d:4e:95,192.168.4.12    # Macbook Pro 2015 (Kal's Mac)
 #
-# END: Fixed lease hosts
+# END: Fixed IP hosts
 
 domain=rural
 
