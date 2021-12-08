@@ -61,9 +61,7 @@ def rewrite_config_file(file_name, executable_clause, contents):
 
     with open(file_name, 'wt') as file:
         if executable_clause is not None:
-            file.write(f"""
-{executable_clause}
-""")
+            file.write(f'{executable_clause}')
 
         file.write(f"""
 ###################################################################################################
