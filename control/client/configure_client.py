@@ -221,46 +221,45 @@ log() {{
 
 case $1 in
     bound|renew)
-    [ -z "$router" ] \
+    [ -z "$router" ] \\
         && log err "Should be invoked from udhcpc" && exit 1
+    [ ! -x "/sbin/resolvconf" ] \\
+        && log err "Resolvconf is required" && exit 1
 
-    busybox ifconfig $interface ${{mtu:+mtu $mtu}} $ip netmask $subnet ${{broadcast:+broadcast $broadcast}}
-    busybox ip -4 route flush exact 0.0.0.0/0 dev $interface
+    ifconfig $interface ${{mtu:+mtu $mtu}} $ip netmask $subnet ${{broadcast:+broadcast $broadcast}}
+    ip -4 route flush exact 0.0.0.0/0 dev $interface
 
-    [ ".$subnet" = .255.255.255.255 ] \
+    [ ".$subnet" = .255.255.255.255 ] \\
         && onlink=onlink || onlink=
-    busybox ip -4 route add default via $router dev $interface $onlink metric 30
+    ip -4 route add default via $router dev $interface $onlink
 
-    [ -n "$domain" ] && R="domain $domain" || R=""
+    [ -n "$domain" ] \\
+        && R="domain $domain" || R=""
     for i in $dns; do
         R="$R
 nameserver $i"
     done
 
-    if [ -x /sbin/resolvconf ]; then
-        echo "$R" | resolvconf -a "$interface.udhcpc"
-    else
-        echo "$R" > "$RESOLV_CONF"
-    fi
+    echo "$R" | resolvconf -a "$interface.udhcpc"
 
-    log info "$1: IP=$ip/$subnet hostname=\"hostname\" router=$router domain=\"$domain\" dns=\"$dns\" lease=$lease"
+    log info "$1: IP=$ip/$subnet hostname=$hostname router=$router domain=$domain dns=$dns lease=$lease"
     ;;
 
     deconfig)
-    busybox ip link set $interface up
-    busybox ip -4 addr flush dev $interface
-    busybox ip -4 route flush dev $interface
-    [ -x /sbin/resolvconf ] \
-        && resolvconf -d "$interface.udhcpc"
-    log notice "deconfigured"
+    ip link set $interface up
+    ip -4 addr flush dev $interface
+    ip -4 route flush dev $interface
+    resolvconf -d "$interface.udhcpc"
+
+    log notice "$1: Completed"
     ;;
 
     leasefail | nak)
-    log err "configuration failed: $1: $message"
+    log err "$1: Configuration failure: $message"
     ;;
 
     *)
-    echo "$0: Unknown udhcpc command: $1" >&2
+    log err "$1: Unknown command"
     exit 1
     ;;
 esac
