@@ -70,12 +70,12 @@ class Boost:
                     boost_library_names)),
             native_env.File('make_boost_for_platform.sh'),
             [
-                '{script_path} {install_directory} {boost_version} {compiler_prefix} > boost_for_{arch}_build.log'
+                '{script_path} {install_directory} {boost_version} {compiler} > boost_for_{arch}_build.log'
                 .format(
                     script_path=str(native_env.File('make_boost_for_platform.sh')),
                     install_directory=boost_install_directory,
-                    boost_version=ARGUMENTS.get('BOOST_VERSION', '1.77.0'),
-                    compiler_prefix=arch['prefix'],
+                    boost_version=ARGUMENTS.get('BOOST_VERSION', '1.79.0'),
+                    compiler=arch['prefix'] + 'g++' + arch['suffix'],
                     arch=arch['arch'],
                 ),
             ],
@@ -118,7 +118,7 @@ class CommonNativeEnvironment:
             ('CC', 'gcc'),
             ('CXX', 'g++'),
         ]:
-            env[tool] = arch['prefix'] + name
+            env[tool] = arch['prefix'] + name + arch['suffix']
 
         # Build the Common library
         common = SConscript('common/SConscript',

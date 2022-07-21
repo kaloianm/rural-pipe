@@ -7,14 +7,14 @@ A Raspberry Pi-based client/server system to unify the bandwidth of multiple ava
 These installation and build instructions assume a development machine (DEV), separate from the Raspberry Pi (RPI), running Ubuntu 20.04.
 
 1. (On DEV): Install the build essentials package: `sudo apt install build-essential`
-1. (On DEV): Install the ARM cross-compiler and debugger: `sudo apt install g++-8-arm-linux-gnueabihf gdb-multiarch` (it is important to install version 8 of the cross-compiler if using Raspbian Buster, because it lacks the newer glibc libraty)
+1. (On DEV): Install the ARM cross-compiler and debugger: `sudo apt install gcc-8-arm-linux-gnueabihf g++-8-arm-linux-gnueabihf gdb-multiarch` (it is important to install version 8 of the cross-compiler if using Raspbian Buster, because it lacks the newer glibc library)
 1. (On DEV): The ARM cross-compiler version 8 doesn't get installed with the default suffix, so use `update-alternatives` to fix that up:
    * `sudo update-alternatives --install /usr/bin/arm-linux-gnueabihf-gcc  arm-linux-gnueabihf-gcc  /usr/bin/arm-linux-gnueabihf-gcc-8  10`
    * `sudo update-alternatives --install /usr/bin/arm-linux-gnueabihf-g++  arm-linux-gnueabihf-g++  /usr/bin/arm-linux-gnueabihf-g++-8  10`
 1. (On RPI): Install the GDB server on the Raspberry Pi: `sudo apt install gdbserver`
 1. Clone this repository
-1. Run `scons`
-
+1. Run `scons --client_arch=pi --server_arch=pc`
+ 
 ## INSTALLATION
 
 1. Follow these [instructions](https://www.raspberrypi.org/documentation/configuration/wireless/access-point-routed.md) in order to configure the Raspberry Pi as a Wifi router (so it manages its own internal network)

@@ -24,11 +24,13 @@ import os
 supported_architectures = {
     'pc': {
         'arch': 'pc',
-        'prefix': ''
+        'prefix': '',
+        'suffix': ''
     },
     'pi': {
         'arch': 'pi',
-        'prefix': 'arm-linux-gnueabihf-'
+        'prefix': 'arm-linux-gnueabihf-',
+        'suffix': '-9'
     },
 }
 

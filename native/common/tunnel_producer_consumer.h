@@ -21,6 +21,7 @@
 #include <atomic>
 #include <boost/asio/thread_pool.hpp>
 #include <mutex>
+#include <optional>
 #include <vector>
 
 #include "common/file_descriptor.h"
