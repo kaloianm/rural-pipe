@@ -317,7 +317,8 @@ dhcp-range=br0,192.168.4.10,192.168.4.200,255.255.255.0,12h
 #
 dhcp-host=b0:4e:26:85:04:0c,192.168.4.10    # TP-Link Archer C9 Router (Salon)
 dhcp-host=c0:c9:e3:e2:c4:e1,192.168.4.11    # TP-Link AC750 Router (TV Room)
-dhcp-host=f0:18:98:3d:4e:95,192.168.4.12    # Macbook Pro 2015 (Kal's Mac)
+dhcp-host=f0:18:98:3d:4e:95,192.168.4.12    # Macbook Pro 2017 (Jocelyn's Wifi MAC)
+dhcp-host=f0:18:98:3d:4e:95,192.168.4.13    # Macbook Pro 2021 (Kal's Wifi MAC)
 #
 # END: Fixed IP hosts
 
@@ -334,11 +335,12 @@ rewrite_config_file(
     '/etc/hostapd/hostapd.conf', None, f"""
 interface={WLAN24GHZ}
 bridge=br0
+
 hw_mode=a
-ieee80211n=1
 channel=36
 ieee80211d=1
 country_code=FR
+ieee80211ac=1
 wmm_enabled=1
 
 ssid=RuralPipe (Kitchen)
@@ -351,6 +353,7 @@ rsn_pairwise=CCMP
 wpa_passphrase={options.wifi_password}""")
 
 set_config_option('/etc/default/hostapd', 'DAEMON_CONF="/etc/hostapd/hostapd.conf"')
+set_config_option('/etc/default/hostapd', 'DAEMON_OPTS="-f /var/log/hostapd.log"')
 
 shell_command('sudo systemctl unmask hostapd')
 shell_command('sudo systemctl enable hostapd')
@@ -364,17 +367,7 @@ shell_command('netfilter-persistent save')
 
 append_config_line('/etc/iproute2/rt_tables', '1    rpi')
 
-# 7. Manual instructions for starting the wwan0 interface
-#
-# TODO: Automate these instructions
-#
-# Enable the GSM radio by running this command:
-#   `sudo qmicli -d /dev/cdc-wdm0 --dms-set-operating-mode='online'`
-#
-# In case the interface gets stuck, reset it using and then bring it back online:
-#   `sudo qmicli -d /dev/cdc-wdm0 --dms-set-operating-mode='reset'`
-
-# 8. Manual instructions for using OpenVPN with NordVPN
+# 7. Manual instructions for using OpenVPN with NordVPN
 #
 # TODO: Automate these instructions
 #
