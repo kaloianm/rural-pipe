@@ -30,7 +30,7 @@ supported_architectures = {
     'pi': {
         'arch': 'pi',
         'prefix': 'arm-linux-gnueabihf-',
-        'suffix': '-9'
+        'suffix': '-8'
     },
 }
 

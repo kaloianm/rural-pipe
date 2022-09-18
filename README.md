@@ -6,13 +6,12 @@ A Raspberry Pi-based client/server system to unify the bandwidth of multiple ava
 
 These installation and build instructions assume a development machine (DEV), separate from the Raspberry Pi (RPI), running Ubuntu 20.04.
 
-1. (On DEV): Install the build essentials package: `sudo apt install build-essential`
+1. (On DEV): Install the build essentials package: `sudo apt install build-essential git`
 1. (On DEV): Install the ARM cross-compiler and debugger: `sudo apt install gcc-8-arm-linux-gnueabihf g++-8-arm-linux-gnueabihf gdb-multiarch` (it is important to install version 8 of the cross-compiler if using Raspbian Buster, because it lacks the newer glibc library)
-1. (On DEV): The ARM cross-compiler version 8 doesn't get installed with the default suffix, so use `update-alternatives` to fix that up:
-   * `sudo update-alternatives --install /usr/bin/arm-linux-gnueabihf-gcc  arm-linux-gnueabihf-gcc  /usr/bin/arm-linux-gnueabihf-gcc-8  10`
-   * `sudo update-alternatives --install /usr/bin/arm-linux-gnueabihf-g++  arm-linux-gnueabihf-g++  /usr/bin/arm-linux-gnueabihf-g++-8  10`
-1. (On RPI): Install the GDB server on the Raspberry Pi: `sudo apt install gdbserver`
-1. Clone this repository
+1. (On DEV): Install SCons: `python3 -m pip install SCons`
+1. (On RPI - Optional): Optionally install the GDB server on the Raspberry Pi to be able to remotely debug from the development PC: `sudo apt install gdbserver`
+1. Clone this repository: `git clone git@github.com:kaloianm/rural-pipe.git`
+1. Build the Boost binaries for both ARM (Raspberry Pi) and PC architectures: `scons --client_arch=pi --server_arch=pc build/native/pi/boost build/native/pc/boost`
 1. Run `scons --client_arch=pi --server_arch=pc`
  
 ## INSTALLATION

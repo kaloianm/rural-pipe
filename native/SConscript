@@ -74,7 +74,7 @@ class Boost:
                 .format(
                     script_path=str(native_env.File('make_boost_for_platform.sh')),
                     install_directory=boost_install_directory,
-                    boost_version=ARGUMENTS.get('BOOST_VERSION', '1.79.0'),
+                    boost_version=ARGUMENTS.get('BOOST_VERSION', '1.80.0'),
                     compiler=arch['prefix'] + 'g++' + arch['suffix'],
                     arch=arch['arch'],
                 ),
