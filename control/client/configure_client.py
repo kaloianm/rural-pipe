@@ -318,7 +318,10 @@ dhcp-range=br0,192.168.4.10,192.168.4.200,255.255.255.0,12h
 dhcp-host=b0:4e:26:85:04:0c,192.168.4.10    # TP-Link Archer C9 Router (Salon)
 dhcp-host=c0:c9:e3:e2:c4:e1,192.168.4.11    # TP-Link AC750 Router (TV Room)
 dhcp-host=f0:18:98:3d:4e:95,192.168.4.12    # Macbook Pro 2017 (Jocelyn's Wifi MAC)
-dhcp-host=f0:18:98:3d:4e:95,192.168.4.13    # Macbook Pro 2021 (Kal's Wifi MAC)
+dhcp-host=a4:ae:12:26:22:16,192.168.4.13    # Macbook Pro 2021 (Kal's LAN MAC)
+dhcp-host=bc:d0:74:0d:4d:01,192.168.4.14    # Macbook Pro 2021 (Kal's Wifi MAC)
+dhcp-host=40:4e:36:93:73:36,192.168.4.15    # Pixel 2
+dhcp-host=0c:c4:13:13:93:1b,192.168.4.16    # Pixel 6 (Kal)
 #
 # END: Fixed IP hosts
 
