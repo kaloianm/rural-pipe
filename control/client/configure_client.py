@@ -171,7 +171,7 @@ shell_command(
     'apt update'
 )
 shell_command(
-    'apt install -y vim screen dnsmasq hostapd netfilter-persistent iptables-persistent bridge-utils openvpn libqmi-utils udhcpc ifmetric snapd'
+    'apt install -y vim screen dnsmasq hostapd netfilter-persistent iptables-persistent bridge-utils openvpn libqmi-utils udhcpc ifmetric snapd net-tools rfkill'
 )
 shell_command(
     'snap install modem-manager'
